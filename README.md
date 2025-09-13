@@ -2,7 +2,7 @@
 
 Experimenting with embeddings and vector databases
 
-Version: 0.0.2 - 9 Sep 2025
+Version: 0.0.3 - 13 Sep 2025
 
 ## Experiment design
 
