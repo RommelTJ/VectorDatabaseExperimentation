@@ -96,12 +96,42 @@ The generic interface should support:
 - **No CI/CD**: Local development only
 - **No production concerns**: Laptop-only deployment
 
-## Next Steps
-1. Start with one database for initial implementation
-2. Build PDF processing pipeline treating pages as images
-3. Integrate ColPali for local multimodal embeddings
-4. Create database adapters following the generic interface
-5. Build simple frontend for testing search capabilities
+## Implementation Plan
+
+### Phase 1: Basic Infrastructure
+1. **Hello World Backend** - Minimal FastAPI with single `/` endpoint returning "Hello World", Dockerized
+2. **Hello World Frontend** - Minimal React+Vite with "Hello World" text, Dockerized
+3. **Connect Frontend to Backend** - Frontend calls backend `/api/health`, display response
+4. **Docker Compose Setup** - Both services in one `docker-compose.yml`, verify they communicate
+
+### Phase 2: Core Structure
+5. **Add PDF Upload Endpoint** - `/api/upload` that accepts PDF, returns filename (no processing)
+6. **Add Frontend Upload** - Basic file input, drag-and-drop for PDFs
+7. **Add Database Config** - Environment variable for `VECTOR_DB_TYPE` (postgres/qdrant/etc), endpoint returns current config
+8. **Abstract Database Interface** - Create base class with methods returning 501 Not Implemented
+
+### Phase 3: Search Interface (No Real Implementation)
+9. **Add Search Endpoints** - `/api/search/text` and `/api/search/image` returning 501 with DB type in error
+10. **Add Search UI** - Text input and image upload that show 501 errors nicely
+11. **Database Adapter Stubs** - One adapter per database, all returning 501 but with different error messages
+12. **Config Switching** - Verify changing `VECTOR_DB_TYPE` switches which 501 error you get
+
+### Phase 4: Ready for Real Implementation
+13. **Add Real ColPali Model** - Load actual ColPali model, create embeddings endpoint
+14. **PDF Processing** - Convert PDF to images with pdf2image, return page count and image dimensions
+
+### Phase 5: First Database Implementation
+15. **Choose first database** (likely Postgres+pgvector or Qdrant)
+16. **Implement real operations** - Connect, create collection, insert, search, delete
+17. **Wire up ColPali** - Generate real embeddings and store them
+18. **Test end-to-end** - Upload PDF, process, search
+
+### Implementation Notes
+- Each step should be minimal and verifiable via Docker
+- User will check each step before proceeding to next
+- All database adapters initially return HTTP 501 Not Implemented
+- Configuration via environment variables to switch between databases
+- No tests, linting, or production concerns
 
 ## Success Metrics for Evaluation
 - **Practicality**: Ease of future use
