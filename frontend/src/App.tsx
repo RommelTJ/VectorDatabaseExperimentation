@@ -5,7 +5,8 @@ function App() {
   const [healthStatus, setHealthStatus] = useState<string>('Checking...')
 
   useEffect(() => {
-    fetch('http://localhost:8000/api/health')
+    const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:8000'
+    fetch(`${apiUrl}/api/health`)
       .then(response => response.json())
       .then(data => {
         setHealthStatus(`Backend ${data.service}: ${data.status}`)
