@@ -70,6 +70,32 @@ The generic interface should support:
 - Hybrid search combining multiple modalities
 - Metadata filtering alongside vector similarity
 
+## Tech Stack
+
+### Backend (Python)
+- **FastAPI**: Async API framework for handling requests
+- **ColPali v1.3**: Local multimodal embeddings (treats PDF pages as images)
+- **pdf2image**: Simple PDF to image conversion
+- **Pydantic**: Data validation and settings management
+- **Python 3.11+**: Modern Python features and performance
+
+### Frontend
+- **React with TypeScript**: UI framework
+- **Vite**: Fast build tool and dev server
+- **Tailwind CSS**: Utility-first styling (no component libraries)
+- **Basic React state**: Simple state management (no Redux/Zustand)
+
+### Infrastructure
+- **Docker Compose**: Orchestrate all vector databases locally
+- **REST API**: Simple HTTP communication (no WebSockets)
+- **Local file uploads**: Direct to API (no cloud storage or pre-signed URLs)
+
+### Development Approach
+- **No tests**: Focus on experimentation
+- **No linting/formatting**: Keep it simple
+- **No CI/CD**: Local development only
+- **No production concerns**: Laptop-only deployment
+
 ## Next Steps
 1. Start with one database for initial implementation
 2. Build PDF processing pipeline treating pages as images
