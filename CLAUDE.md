@@ -1,7 +1,7 @@
 # Vector Database Experimentation - Design Notes
 
 ## Project Overview
-Testing various vector databases with knitting pattern PDFs using Voyage multimodal-3 embeddings. The goal is to compare database performance and developer experience across multiple platforms.
+Testing various vector databases with knitting pattern PDFs using ColPali multimodal embeddings. The goal is to compare database performance and developer experience across multiple platforms.
 
 ## Databases to Test
 - Postgres + pgvector
@@ -16,9 +16,9 @@ Testing various vector databases with knitting pattern PDFs using Voyage multimo
 
 ### Content Processing
 Knitting patterns contain both text (instructions, materials) and visual elements (charts, diagrams, photos). The system needs to handle:
-- Text extraction from PDFs
-- Image extraction from PDFs
-- Multimodal embeddings via Voyage multimodal-3
+- PDF pages as images (no text extraction needed)
+- Patch-based embeddings that capture text, charts, and images together
+- Multimodal embeddings via ColPali (running locally)
 
 ### Search Capabilities
 Three search modalities are being considered:
@@ -60,8 +60,8 @@ Note: Update operations intentionally omitted since PDFs are treated as immutabl
 
 ### Content Storage Strategy
 Each PDF generates:
-- One text embedding for the full document
-- Multiple image embeddings (one per extracted image)
+- Multiple page embeddings (one per PDF page)
+- Patch-based embeddings from ColPali (capturing text and visual elements)
 - Metadata (title, difficulty, yarn weight, etc.)
 
 ### Search Implementation
@@ -72,8 +72,8 @@ The generic interface should support:
 
 ## Next Steps
 1. Start with one database for initial implementation
-2. Build PDF processing pipeline with PyMuPDF or similar
-3. Integrate Voyage multimodal-3 for embeddings
+2. Build PDF processing pipeline treating pages as images
+3. Integrate ColPali for local multimodal embeddings
 4. Create database adapters following the generic interface
 5. Build simple frontend for testing search capabilities
 
