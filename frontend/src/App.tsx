@@ -1,4 +1,5 @@
-import { useEffect, useState, useRef, DragEvent, ChangeEvent } from 'react'
+import { useEffect, useState, useRef } from 'react'
+import type { DragEvent, ChangeEvent } from 'react'
 import './App.css'
 
 function App() {
