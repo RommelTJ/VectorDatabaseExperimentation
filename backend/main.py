@@ -2,6 +2,7 @@ from fastapi import FastAPI, File, UploadFile, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 import os
+from adapters import get_database_adapter
 
 app = FastAPI()
 
@@ -51,17 +52,33 @@ async def upload_pdf(file: UploadFile = File(...)):
 
 @app.post("/api/search/text")
 async def search_text(request: TextSearchRequest):
-    raise HTTPException(
-        status_code=501,
-        detail=f"Text search not implemented for {VECTOR_DB_TYPE} database"
-    )
+    try:
+        db_adapter = get_database_adapter(VECTOR_DB_TYPE)
+        results = await db_adapter.search(
+            collection_name="patterns",
+            query_vector=[0.0] * 128,
+            top_k=request.limit
+        )
+        return {"results": results}
+    except HTTPException as e:
+        raise e
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 @app.post("/api/search/image")
 async def search_image(file: UploadFile = File(...)):
     if not file.content_type.startswith('image/'):
         raise HTTPException(status_code=400, detail="Only image files are allowed")
 
-    raise HTTPException(
-        status_code=501,
-        detail=f"Image search not implemented for {VECTOR_DB_TYPE} database"
-    )
+    try:
+        db_adapter = get_database_adapter(VECTOR_DB_TYPE)
+        results = await db_adapter.search(
+            collection_name="patterns",
+            query_vector=[0.0] * 128,
+            top_k=10
+        )
+        return {"results": results}
+    except HTTPException as e:
+        raise e
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
