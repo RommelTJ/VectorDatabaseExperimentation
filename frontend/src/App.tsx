@@ -6,7 +6,11 @@ function App() {
   const [healthStatus, setHealthStatus] = useState<string>('Checking...')
   const [isDragging, setIsDragging] = useState(false)
   const [uploadStatus, setUploadStatus] = useState<string>('')
+  const [textQuery, setTextQuery] = useState<string>('')
+  const [textSearchStatus, setTextSearchStatus] = useState<string>('')
+  const [imageSearchStatus, setImageSearchStatus] = useState<string>('')
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const imageInputRef = useRef<HTMLInputElement>(null)
   const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:8000'
 
   useEffect(() => {
@@ -80,6 +84,57 @@ function App() {
     }
   }
 
+  const handleTextSearch = async () => {
+    if (!textQuery.trim()) {
+      setTextSearchStatus('Please enter a search query')
+      return
+    }
+
+    try {
+      setTextSearchStatus('Searching...')
+      const response = await fetch(`${apiUrl}/api/search/text`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          query: textQuery,
+          limit: 10
+        })
+      })
+
+      if (!response.ok) {
+        const error = await response.json()
+        setTextSearchStatus(`Error: ${error.detail || 'Search failed'}`)
+      }
+    } catch (error) {
+      setTextSearchStatus(`Error: ${error}`)
+    }
+  }
+
+  const handleImageSearch = async (e: ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+
+    const formData = new FormData()
+    formData.append('file', file)
+
+    try {
+      setImageSearchStatus('Searching...')
+      const response = await fetch(`${apiUrl}/api/search/image`, {
+        method: 'POST',
+        body: formData
+      })
+
+      if (!response.ok) {
+        const error = await response.json()
+        setImageSearchStatus(`Error: ${error.detail || 'Search failed'}`)
+      }
+    } catch (error) {
+      setImageSearchStatus(`Error: ${error}`)
+    }
+  }
+
   return (
     <div>
       <h1>Vector Database Experimentation</h1>
@@ -112,6 +167,88 @@ function App() {
       </div>
 
       {uploadStatus && <p>Status: {uploadStatus}</p>}
+
+      <div style={{ marginTop: '40px' }}>
+        <h2>Search</h2>
+
+        <div style={{ marginBottom: '30px' }}>
+          <h3>Text Search</h3>
+          <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+            <input
+              type="text"
+              value={textQuery}
+              onChange={(e) => setTextQuery(e.target.value)}
+              placeholder="Enter search query..."
+              style={{
+                padding: '8px',
+                borderRadius: '4px',
+                border: '1px solid #ccc',
+                flex: 1
+              }}
+              onKeyPress={(e) => e.key === 'Enter' && handleTextSearch()}
+            />
+            <button
+              onClick={handleTextSearch}
+              style={{
+                padding: '8px 16px',
+                borderRadius: '4px',
+                border: '1px solid #0066cc',
+                backgroundColor: '#0066cc',
+                color: 'white',
+                cursor: 'pointer'
+              }}
+            >
+              Search
+            </button>
+          </div>
+          {textSearchStatus && (
+            <p style={{
+              marginTop: '10px',
+              padding: '10px',
+              borderRadius: '4px',
+              backgroundColor: textSearchStatus.includes('Error') ? '#ffebee' : '#e3f2fd',
+              color: textSearchStatus.includes('Error') ? '#c62828' : '#1565c0'
+            }}>
+              {textSearchStatus}
+            </p>
+          )}
+        </div>
+
+        <div>
+          <h3>Image Search</h3>
+          <button
+            onClick={() => imageInputRef.current?.click()}
+            style={{
+              padding: '8px 16px',
+              borderRadius: '4px',
+              border: '1px solid #0066cc',
+              backgroundColor: '#0066cc',
+              color: 'white',
+              cursor: 'pointer'
+            }}
+          >
+            Upload Image to Search
+          </button>
+          <input
+            ref={imageInputRef}
+            type="file"
+            accept="image/*"
+            onChange={handleImageSearch}
+            style={{ display: 'none' }}
+          />
+          {imageSearchStatus && (
+            <p style={{
+              marginTop: '10px',
+              padding: '10px',
+              borderRadius: '4px',
+              backgroundColor: imageSearchStatus.includes('Error') ? '#ffebee' : '#e3f2fd',
+              color: imageSearchStatus.includes('Error') ? '#c62828' : '#1565c0'
+            }}>
+              {imageSearchStatus}
+            </p>
+          )}
+        </div>
+      </div>
     </div>
   )
 }
