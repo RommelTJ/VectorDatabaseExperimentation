@@ -2,7 +2,7 @@
 
 Experimenting with embeddings and vector databases
 
-Version: 0.0.3 - 13 Sep 2025
+Version: 0.1.0 - 20 Sep 2025
 
 ## Experiment design
 
@@ -10,7 +10,7 @@ This project aims to test out various vector databases with knitting PDFs.
 
 1. Collect samples of knitting pattern PDFs. 50-100 patterns should suffice.
 2. Set up a Python project with Docker compose for local databases.
-3. Implement an embedding pipeline with Voyage multimodal-3.
+3. Implement an embedding pipeline with ColPali (running locally).
 4. Set up a front-end with a text search box and image similarity search.
 
 The setup will be repeated for the following databases: 
