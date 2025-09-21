@@ -98,27 +98,37 @@ The generic interface should support:
 
 ## Implementation Plan
 
-### Phase 1: Basic Infrastructure
-1. **Hello World Backend** - Minimal FastAPI with single `/` endpoint returning "Hello World", Dockerized
-2. **Hello World Frontend** - Minimal React+Vite with "Hello World" text, Dockerized
-3. **Connect Frontend to Backend** - Frontend calls backend `/api/health`, display response
-4. **Docker Compose Setup** - Both services in one `docker-compose.yml`, verify they communicate
+### Phase 1: Basic Infrastructure ✅
+1. **Hello World Backend** - Minimal FastAPI with single `/` endpoint returning "Hello World", Dockerized ✅
+2. **Hello World Frontend** - Minimal React+Vite with "Hello World" text, Dockerized ✅
+3. **Connect Frontend to Backend** - Frontend calls backend `/api/health`, display response ✅
+4. **Docker Compose Setup** - Both services in one `docker-compose.yml`, verify they communicate ✅
 
-### Phase 2: Core Structure
-5. **Add PDF Upload Endpoint** - `/api/upload` that accepts PDF, returns filename (no processing)
-6. **Add Frontend Upload** - Basic file input, drag-and-drop for PDFs
-7. **Add Database Config** - Environment variable for `VECTOR_DB_TYPE` (postgres/qdrant/etc), endpoint returns current config
-8. **Abstract Database Interface** - Create base class with methods returning 501 Not Implemented
+### Phase 2: Core Structure ✅
+5. **Add PDF Upload Endpoint** - `/api/upload` that accepts PDF, returns filename (no processing) ✅
+6. **Add Frontend Upload** - Basic file input, drag-and-drop for PDFs ✅
+7. **Add Database Config** - Environment variable for `VECTOR_DB_TYPE` (postgres/qdrant/etc), endpoint returns current config ✅
+8. **Abstract Database Interface** - Create base class with methods returning 501 Not Implemented ✅
 
-### Phase 3: Search Interface (No Real Implementation)
-9. **Add Search Endpoints** - `/api/search/text` and `/api/search/image` returning 501 with DB type in error
-10. **Add Search UI** - Text input and image upload that show 501 errors nicely
-11. **Database Adapter Stubs** - One adapter per database, all returning 501 but with different error messages
-12. **Config Switching** - Verify changing `VECTOR_DB_TYPE` switches which 501 error you get
+### Phase 3: Search Interface (No Real Implementation) ✅
+9. **Add Search Endpoints** - `/api/search/text` and `/api/search/image` returning 501 with DB type in error ✅
+10. **Add Search UI** - Text input and image upload that show 501 errors nicely ✅
+11. **Database Adapter Stubs** - One adapter per database, all returning 501 but with different error messages ✅
+12. **Config Switching** - Verify changing `VECTOR_DB_TYPE` switches which 501 error you get ✅
 
-### Phase 4: Ready for Real Implementation
-13. **Add Real ColPali Model** - Load actual ColPali model, create embeddings endpoint
-14. **PDF Processing** - Convert PDF to images with pdf2image, return page count and image dimensions
+### Phase 4: Ready for Real Implementation ✅
+13. **Add Real ColPali Model** - Load actual ColPali model, create embeddings endpoint ✅
+14. **PDF Processing** - Convert PDF to images with pdf2image, return page count and image dimensions ✅
+
+#### Phase 4 Implementation Notes
+- ColPali v1.3 model (vidore/colpali-v1.3) successfully integrated with automatic download
+- Model cached in Docker volume for persistence between container restarts
+- **Performance on CPU (Docker on macOS):**
+  - PDF embedding generation: ~50-60 seconds per 4-page PDF (1031 patches per page)
+  - Query embedding generation: <1 second
+  - Model download: ~6GB, one-time on first use
+- Docker Desktop memory increased from 8GB to 16GB to handle model loading
+- Running on MPS (Apple Silicon GPU) would be ~5-10x faster but requires native execution
 
 ### Phase 5: First Database Implementation
 15. **Choose first database** (likely Postgres+pgvector or Qdrant)
