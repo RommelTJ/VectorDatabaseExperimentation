@@ -2,7 +2,10 @@ from fastapi import FastAPI, File, UploadFile, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 import os
+import logging
 from adapters import get_database_adapter
+from colpali_model import colpali_model
+from pdf_processor import pdf_processor
 
 app = FastAPI()
 
@@ -82,3 +85,52 @@ async def search_image(file: UploadFile = File(...)):
         raise e
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/api/process/pdf")
+async def process_pdf(file: UploadFile = File(...)):
+    if not file.filename.lower().endswith('.pdf'):
+        raise HTTPException(status_code=400, detail="Only PDF files are allowed")
+
+    try:
+        pdf_bytes = await file.read()
+        pdf_info = pdf_processor.get_pdf_info(pdf_bytes)
+        pdf_info["filename"] = file.filename
+        pdf_info["size_bytes"] = len(pdf_bytes)
+        return pdf_info
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error processing PDF: {str(e)}")
+
+@app.post("/api/embeddings/generate")
+async def generate_embeddings(file: UploadFile = File(...)):
+    if not file.filename.lower().endswith('.pdf'):
+        raise HTTPException(status_code=400, detail="Only PDF files are allowed")
+
+    try:
+        pdf_bytes = await file.read()
+        images = pdf_processor.pdf_to_images(pdf_bytes)
+
+        embeddings = colpali_model.embed_images(images)
+
+        return {
+            "filename": file.filename,
+            "page_count": len(images),
+            "embeddings_shape": list(embeddings.shape),
+            "embeddings_dtype": str(embeddings.dtype),
+            "device": str(embeddings.device)
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error generating embeddings: {str(e)}")
+
+@app.post("/api/embeddings/query")
+async def embed_query(request: TextSearchRequest):
+    try:
+        embeddings = colpali_model.embed_queries([request.query])
+
+        return {
+            "query": request.query,
+            "embeddings_shape": list(embeddings.shape),
+            "embeddings_dtype": str(embeddings.dtype),
+            "device": str(embeddings.device)
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error embedding query: {str(e)}")
