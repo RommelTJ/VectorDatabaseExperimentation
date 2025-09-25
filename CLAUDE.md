@@ -130,11 +130,90 @@ The generic interface should support:
 - Docker Desktop memory increased from 8GB to 16GB to handle model loading
 - Running on MPS (Apple Silicon GPU) would be ~5-10x faster but requires native execution
 
-### Phase 5: First Database Implementation
-15. **Choose first database** (likely Postgres+pgvector or Qdrant)
-16. **Implement real operations** - Connect, create collection, insert, search, delete
-17. **Wire up ColPali** - Generate real embeddings and store them
-18. **Test end-to-end** - Upload PDF, process, search
+### Phase 5: Database Implementation (Repeat for Each Database)
+
+**IMPORTANT**: Work through each step sequentially. Complete and verify each step before proceeding to the next.
+
+#### Phase 5A: Embeddings Preparation (One-time setup)
+1. **Create Training/Test Split** - Randomize 93 PDFs, select 80 for training, 13 for testing
+2. **Build Offline Ingestion Script** - Script to pre-embed training PDFs using ColPali
+3. **Generate Embeddings Cache** - Process all 80 training PDFs, save embeddings to `./embeddings/` directory
+4. **Verify Cache Format** - Ensure embeddings are loadable and contain expected dimensions
+
+#### Phase 5B: Database Implementation (Repeat for each database)
+
+##### Step 1: Docker Setup
+- Add database service to `docker-compose.yml`
+- Configure appropriate volumes and network settings
+- Start service and verify it's running
+- **Verification**: Check docker logs, ensure service is healthy
+
+##### Step 2: Connection Implementation
+- Implement `connect()` method in database adapter
+- Handle connection pooling if applicable
+- Add proper error handling for connection failures
+- **Verification**: Test connection with simple ping/health check
+
+##### Step 3: Collection/Table Creation
+- Implement `create_collection()` method
+- Configure vector dimensions (128 for ColPali)
+- Set up appropriate indexes (HNSW with default parameters)
+- Define schema for metadata fields
+- **Verification**: Check collection exists in database, verify schema
+
+##### Step 4: Insert Implementation
+- Implement `insert()` method with batch support
+- Load embeddings from cache directory
+- Handle metadata (pdf_id, page_num, title, etc.)
+- Implement proper error handling and retries
+- **Verification**: Insert 2-3 test PDFs, query database directly to verify data
+
+##### Step 5: Search Implementation
+- Implement `search()` for text queries
+- Support configurable k (top-k results)
+- Use cosine similarity as default metric
+- Return results with scores and metadata
+- **Verification**: Test with known queries, verify result ordering
+
+##### Step 6: Delete Implementation
+- Implement `delete()` method
+- Support deletion by pdf_id
+- Handle cascading deletes for all pages of a PDF
+- **Verification**: Delete a test PDF, verify removal from database
+
+##### Step 7: Full Ingestion Test
+- Load all 80 training PDFs from cache
+- Monitor ingestion time and memory usage
+- Verify all documents are searchable
+- **Verification**: Count documents in database, test random searches
+
+##### Step 8: Frontend Integration Test
+- Test upload of new PDF (from 13 test set)
+- Verify real-time embedding generation
+- Test search across all ingested content
+- Test cross-modal search capabilities
+- **Verification**: Complete end-to-end workflow in UI
+
+##### Step 9: Performance Evaluation
+- Measure query latency (p50, p95, p99)
+- Test with concurrent searches
+- Monitor resource usage during operations
+- Document any database-specific optimizations applied
+
+##### Step 10: Document Findings
+- Record setup complexity and pain points
+- Note unique features or limitations discovered
+- Rate on practicality, learnings, and fun metrics
+- Save performance metrics for comparison
+
+#### Database Order
+1. **Postgres + pgvector** (chosen as first implementation)
+2. Qdrant
+3. Redis
+4. Elasticsearch
+5. Milvus
+6. Weaviate
+7. MongoDB
 
 ### Implementation Notes
 - Each step should be minimal and verifiable via Docker
