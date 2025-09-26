@@ -4,6 +4,36 @@ Experimenting with embeddings and vector databases
 
 Version: 0.1.0 - 20 Sep 2025
 
+## Quick Start
+
+### Running the Application
+```bash
+# Start all services
+docker-compose up
+
+# Frontend will be available at http://localhost:3000
+# Backend API at http://localhost:8000
+```
+
+### Generating Embeddings Cache
+
+Before testing vector databases, you need to generate embeddings for the training PDFs:
+
+```bash
+# Test with 2 PDFs first (recommended)
+docker-compose exec backend python ingest_training_data.py --limit 2
+
+# Or test with specific PDFs
+docker-compose exec backend python ingest_training_data.py --pdfs "birdseed.pdf,Chex Cowl.pdf"
+
+# Generate embeddings for all 80 training PDFs (~60-80 minutes on CPU)
+docker-compose exec backend python ingest_training_data.py
+
+# To abort: Press Ctrl+C (script will resume from where it left off)
+```
+
+Embeddings are saved to `./data/embeddings/` and are automatically skipped if already processed.
+
 ## Experiment design
 
 This project aims to test out various vector databases with knitting PDFs.
