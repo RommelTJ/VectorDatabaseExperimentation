@@ -146,11 +146,11 @@ def main():
     if os.path.exists('/app/data'):
         # Running in Docker
         data_dir = Path('/app/data')
-        output_dir = Path('/app/embeddings')
+        output_dir = Path('/app/data/embeddings')
     else:
         # Running locally (for development/testing)
         data_dir = Path('../data')
-        output_dir = Path('../embeddings')
+        output_dir = Path('../data/embeddings')
 
     pdf_dir = data_dir  # PDFs are directly in data/ directory
 
