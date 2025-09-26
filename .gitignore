@@ -209,3 +209,4 @@ __marimo__/
 # Intellij
 *.idea/**
 data/*.pdf
+data/embeddings/
