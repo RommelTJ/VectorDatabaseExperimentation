@@ -10,6 +10,7 @@ services:
       - VECTOR_DB_TYPE=${VECTOR_DB_TYPE:-postgres}
     volumes:
       - huggingface-cache:/root/.cache/huggingface
+      - ./data:/app/data  # Mount data directory (PDFs and embeddings)
     networks:
       - app-network
     deploy:
