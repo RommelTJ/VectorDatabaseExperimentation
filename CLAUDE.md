@@ -176,7 +176,7 @@ The generic interface should support:
 - Return results with scores and metadata
 - **Verification**: Test with known queries, verify result ordering
 
-##### Step 6: Delete Implementation
+##### Step 6: Delete Implementation ✅
 - Implement `delete()` method
 - Support deletion by pdf_id
 - Handle cascading deletes for all pages of a PDF
