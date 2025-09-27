@@ -19,6 +19,18 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+@app.on_event("startup")
+async def startup_event():
+    """Preload the ColPali model at startup to avoid memory issues during requests"""
+    print("Starting up... preloading ColPali model")
+    try:
+        colpali_model.load()
+        print("ColPali model preloaded successfully")
+    except Exception as e:
+        print(f"Failed to preload ColPali model: {e}")
+        # Don't fail startup, but log the issue
+        pass
+
 @app.get("/")
 async def root():
     return {"message": "Hello World"}
