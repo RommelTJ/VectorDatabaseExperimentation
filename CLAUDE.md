@@ -182,11 +182,12 @@ The generic interface should support:
 - Handle cascading deletes for all pages of a PDF
 - **Verification**: Delete a test PDF, verify removal from database
 
-##### Step 7: Full Ingestion Test
+##### Step 7: Full Ingestion Test ✅
 - Load all 80 training PDFs from cache
 - Monitor ingestion time and memory usage
 - Verify all documents are searchable
 - **Verification**: Count documents in database, test random searches
+- **Results**: 423,741 embeddings in 305.91s (1,385 embeddings/sec)
 
 ##### Step 8: Frontend Integration Test
 - Test upload of new PDF (from 13 test set)
