@@ -44,12 +44,27 @@ class ColPaliModel:
         if self.model is None:
             self.load()
 
-        batch_images = self.processor.process_images(images).to(self.model.device)
+        # Process images in smaller batches to prevent memory issues
+        max_batch_size = 4  # Limit batch size for memory management
+        all_embeddings = []
 
-        with torch.no_grad():
-            embeddings = self.model(**batch_images)
+        for i in range(0, len(images), max_batch_size):
+            batch_images_slice = images[i:i + max_batch_size]
+            batch_images = self.processor.process_images(batch_images_slice).to(self.model.device)
 
-        return embeddings
+            with torch.no_grad():
+                embeddings = self.model(**batch_images)
+                all_embeddings.append(embeddings.cpu())  # Move to CPU to free GPU memory
+
+                # Clear cache to prevent memory buildup
+                if hasattr(torch.cuda, 'empty_cache'):
+                    torch.cuda.empty_cache()
+
+        # Concatenate all embeddings
+        if len(all_embeddings) == 1:
+            return all_embeddings[0]
+        else:
+            return torch.cat(all_embeddings, dim=0)
 
     def embed_queries(self, queries: List[str]) -> torch.Tensor:
         if self.model is None:
@@ -59,6 +74,9 @@ class ColPaliModel:
 
         with torch.no_grad():
             embeddings = self.model(**batch_queries)
+            # Clear cache to prevent memory buildup
+            if hasattr(torch.cuda, 'empty_cache'):
+                torch.cuda.empty_cache()
 
         return embeddings
 

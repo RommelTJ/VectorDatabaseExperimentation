@@ -8,10 +8,18 @@ services:
     environment:
       - PYTHONUNBUFFERED=1
       - VECTOR_DB_TYPE=${VECTOR_DB_TYPE:-postgres}
+      - POSTGRES_HOST=postgres
+      - POSTGRES_PORT=5432
+      - POSTGRES_USER=vectordb
+      - POSTGRES_PASSWORD=vectordb123
+      - POSTGRES_DB=knitting_patterns
     volumes:
       - huggingface-cache:/root/.cache/huggingface
+      - ./data:/app/data  # Mount data directory (PDFs and embeddings)
     networks:
       - app-network
+    depends_on:
+      - postgres
     deploy:
       resources:
         limits:
@@ -26,9 +34,28 @@ services:
     networks:
       - app-network
 
+  postgres:
+    image: pgvector/pgvector:pg16
+    ports:
+      - "5432:5432"
+    environment:
+      - POSTGRES_USER=vectordb
+      - POSTGRES_PASSWORD=vectordb123
+      - POSTGRES_DB=knitting_patterns
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    networks:
+      - app-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U vectordb -d knitting_patterns"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
 networks:
   app-network:
     driver: bridge
 
 volumes:
   huggingface-cache:
+  postgres-data:

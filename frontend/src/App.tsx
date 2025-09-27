@@ -7,8 +7,8 @@ function App() {
   const [isDragging, setIsDragging] = useState(false)
   const [uploadStatus, setUploadStatus] = useState<string>('')
   const [textQuery, setTextQuery] = useState<string>('')
-  const [textSearchStatus, setTextSearchStatus] = useState<string>('')
-  const [imageSearchStatus, setImageSearchStatus] = useState<string>('')
+  const [searchStatus, setSearchStatus] = useState<string>('')
+  const [searchResults, setSearchResults] = useState<any[]>([])
   const fileInputRef = useRef<HTMLInputElement>(null)
   const imageInputRef = useRef<HTMLInputElement>(null)
   const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:8000'
@@ -86,12 +86,12 @@ function App() {
 
   const handleTextSearch = async () => {
     if (!textQuery.trim()) {
-      setTextSearchStatus('Please enter a search query')
+      setSearchStatus('Please enter a search query')
       return
     }
 
     try {
-      setTextSearchStatus('Searching...')
+      setSearchStatus('Searching...')
       const response = await fetch(`${apiUrl}/api/search/text`, {
         method: 'POST',
         headers: {
@@ -103,12 +103,18 @@ function App() {
         })
       })
 
-      if (!response.ok) {
+      if (response.ok) {
+        const data = await response.json()
+        setSearchResults(data.results || [])
+        setSearchStatus(`Found ${data.count || 0} results`)
+      } else {
         const error = await response.json()
-        setTextSearchStatus(`Error: ${error.detail || 'Search failed'}`)
+        setSearchStatus(`Error: ${error.detail || 'Search failed'}`)
+        setSearchResults([])
       }
     } catch (error) {
-      setTextSearchStatus(`Error: ${error}`)
+      setSearchStatus(`Error: ${error}`)
+      setSearchResults([])
     }
   }
 
@@ -120,18 +126,24 @@ function App() {
     formData.append('file', file)
 
     try {
-      setImageSearchStatus('Searching...')
+      setSearchStatus('Searching...')
       const response = await fetch(`${apiUrl}/api/search/image`, {
         method: 'POST',
         body: formData
       })
 
-      if (!response.ok) {
+      if (response.ok) {
+        const data = await response.json()
+        setSearchResults(data.results || [])
+        setSearchStatus(`Found ${data.count || 0} results`)
+      } else {
         const error = await response.json()
-        setImageSearchStatus(`Error: ${error.detail || 'Search failed'}`)
+        setSearchStatus(`Error: ${error.detail || 'Search failed'}`)
+        setSearchResults([])
       }
     } catch (error) {
-      setImageSearchStatus(`Error: ${error}`)
+      setSearchStatus(`Error: ${error}`)
+      setSearchResults([])
     }
   }
 
@@ -171,83 +183,102 @@ function App() {
       <div style={{ marginTop: '40px' }}>
         <h2>Search</h2>
 
-        <div style={{ marginBottom: '30px' }}>
-          <h3>Text Search</h3>
-          <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
-            <input
-              type="text"
-              value={textQuery}
-              onChange={(e) => setTextQuery(e.target.value)}
-              placeholder="Enter search query..."
-              style={{
-                padding: '8px',
-                borderRadius: '4px',
-                border: '1px solid #ccc',
-                flex: 1
-              }}
-              onKeyPress={(e) => e.key === 'Enter' && handleTextSearch()}
-            />
+        {/* Search Controls Row */}
+        <div style={{ display: 'flex', gap: '20px', marginBottom: '20px' }}>
+          {/* Text Search */}
+          <div style={{ flex: 1 }}>
+            <h3>Text Search</h3>
+            <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+              <input
+                type="text"
+                value={textQuery}
+                onChange={(e) => setTextQuery(e.target.value)}
+                placeholder="Enter search query..."
+                style={{
+                  padding: '8px',
+                  borderRadius: '4px',
+                  border: '1px solid #ccc',
+                  flex: 1
+                }}
+                onKeyPress={(e) => e.key === 'Enter' && handleTextSearch()}
+              />
+              <button
+                onClick={handleTextSearch}
+                style={{
+                  padding: '8px 16px',
+                  borderRadius: '4px',
+                  border: '1px solid #0066cc',
+                  backgroundColor: '#0066cc',
+                  color: 'white',
+                  cursor: 'pointer'
+                }}
+              >
+                Search
+              </button>
+            </div>
+          </div>
+
+          {/* Image Search */}
+          <div style={{ flex: 1 }}>
+            <h3>Image Search</h3>
             <button
-              onClick={handleTextSearch}
+              onClick={() => imageInputRef.current?.click()}
               style={{
                 padding: '8px 16px',
                 borderRadius: '4px',
                 border: '1px solid #0066cc',
                 backgroundColor: '#0066cc',
                 color: 'white',
-                cursor: 'pointer'
+                cursor: 'pointer',
+                width: '100%'
               }}
             >
-              Search
+              Upload Image to Search
             </button>
+            <input
+              ref={imageInputRef}
+              type="file"
+              accept="image/*"
+              onChange={handleImageSearch}
+              style={{ display: 'none' }}
+            />
           </div>
-          {textSearchStatus && (
-            <p style={{
-              marginTop: '10px',
-              padding: '10px',
-              borderRadius: '4px',
-              backgroundColor: textSearchStatus.includes('Error') ? '#ffebee' : '#e3f2fd',
-              color: textSearchStatus.includes('Error') ? '#c62828' : '#1565c0'
-            }}>
-              {textSearchStatus}
-            </p>
-          )}
         </div>
 
-        <div>
-          <h3>Image Search</h3>
-          <button
-            onClick={() => imageInputRef.current?.click()}
-            style={{
-              padding: '8px 16px',
-              borderRadius: '4px',
-              border: '1px solid #0066cc',
-              backgroundColor: '#0066cc',
-              color: 'white',
-              cursor: 'pointer'
-            }}
-          >
-            Upload Image to Search
-          </button>
-          <input
-            ref={imageInputRef}
-            type="file"
-            accept="image/*"
-            onChange={handleImageSearch}
-            style={{ display: 'none' }}
-          />
-          {imageSearchStatus && (
-            <p style={{
-              marginTop: '10px',
-              padding: '10px',
-              borderRadius: '4px',
-              backgroundColor: imageSearchStatus.includes('Error') ? '#ffebee' : '#e3f2fd',
-              color: imageSearchStatus.includes('Error') ? '#c62828' : '#1565c0'
-            }}>
-              {imageSearchStatus}
-            </p>
-          )}
-        </div>
+        {/* Search Status */}
+        {searchStatus && (
+          <p style={{
+            marginBottom: '10px',
+            padding: '10px',
+            borderRadius: '4px',
+            backgroundColor: searchStatus.includes('Error') ? '#ffebee' : '#e3f2fd',
+            color: searchStatus.includes('Error') ? '#c62828' : '#1565c0'
+          }}>
+            {searchStatus}
+          </p>
+        )}
+
+        {/* Search Results */}
+        {searchResults.length > 0 && (
+          <div style={{ marginTop: '20px' }}>
+            <h4>Search Results:</h4>
+            {searchResults.map((result, index) => (
+              <div key={index} style={{
+                padding: '10px',
+                marginBottom: '10px',
+                borderRadius: '4px',
+                backgroundColor: '#f5f5f5',
+                border: '1px solid #ddd',
+                color: '#333'
+              }}>
+                <div><strong>PDF:</strong> {result.title}</div>
+                <div><strong>Page:</strong> {result.page_num + 1}</div>
+                <div><strong>Score:</strong> {result.score.toFixed(4)}</div>
+                <div><strong>PDF ID:</strong> {result.pdf_id}</div>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
     </div>
   )
