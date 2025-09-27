@@ -236,7 +236,8 @@ function App() {
                   marginBottom: '10px',
                   borderRadius: '4px',
                   backgroundColor: '#f5f5f5',
-                  border: '1px solid #ddd'
+                  border: '1px solid #ddd',
+                  color: '#333'
                 }}>
                   <div><strong>PDF:</strong> {result.title}</div>
                   <div><strong>Page:</strong> {result.page_num + 1}</div>
@@ -291,7 +292,8 @@ function App() {
                   marginBottom: '10px',
                   borderRadius: '4px',
                   backgroundColor: '#f5f5f5',
-                  border: '1px solid #ddd'
+                  border: '1px solid #ddd',
+                  color: '#333'
                 }}>
                   <div><strong>PDF:</strong> {result.title}</div>
                   <div><strong>Page:</strong> {result.page_num + 1}</div>
