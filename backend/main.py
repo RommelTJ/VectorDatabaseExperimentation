@@ -78,16 +78,128 @@ async def create_collection(collection_name: str = "patterns"):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+@app.post("/api/db/test-insert")
+async def test_insert_embeddings(num_pdfs: int = 2):
+    """Test inserting embeddings from cache"""
+    import json
+    import pickle
+    from pathlib import Path
+
+    try:
+        db_adapter = get_database_adapter(VECTOR_DB_TYPE)
+        await db_adapter.connect()
+
+        # Get list of embedding files (pkl files)
+        embeddings_dir = Path("/app/data/embeddings")
+        embedding_files = sorted(list(embeddings_dir.glob("*_embeddings.pkl")))[:num_pdfs]
+
+        if not embedding_files:
+            raise HTTPException(status_code=404, detail="No embedding files found in cache")
+
+        total_inserted = 0
+        for emb_file in embedding_files:
+            # Load embeddings from pickle file
+            with open(emb_file, 'rb') as f:
+                embeddings_data = pickle.load(f)
+
+            # Load metadata from corresponding JSON file
+            metadata_file = emb_file.parent / emb_file.name.replace('_embeddings.pkl', '_metadata.json')
+            with open(metadata_file, 'r') as f:
+                metadata_info = json.load(f)
+
+            pdf_name = metadata_info['metadata']['pdf_name']
+            pdf_id = pdf_name.replace('.pdf', '')
+
+            # Process each page
+            for page_idx, page_info in enumerate(metadata_info['metadata']['pages']):
+                page_embeddings = embeddings_data[page_idx]  # Shape: (num_patches, 128)
+
+                # Create metadata for each patch
+                metadata_list = []
+                for patch_idx in range(page_info['num_patches']):
+                    metadata_list.append({
+                        'pdf_id': pdf_id,
+                        'page_num': page_idx,
+                        'patch_index': patch_idx,
+                        'title': pdf_name,
+                        'difficulty': 'unknown',
+                        'yarn_weight': 'unknown'
+                    })
+
+                # Convert embeddings to list format
+                embeddings_list = page_embeddings.tolist()
+
+                # Insert this page's embeddings
+                await db_adapter.insert("patterns", embeddings_list, metadata_list)
+                total_inserted += len(metadata_list)
+                print(f"Inserted {len(metadata_list)} embeddings for {pdf_name} page {page_idx}")
+
+        await db_adapter.disconnect()
+
+        return {
+            "status": "success",
+            "database": VECTOR_DB_TYPE,
+            "files_processed": len(embedding_files),
+            "total_embeddings": total_inserted,
+            "message": f"Successfully inserted {total_inserted} embeddings from {len(embedding_files)} PDFs"
+        }
+
+    except HTTPException as e:
+        raise e
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
 class TextSearchRequest(BaseModel):
     query: str
     limit: int = 10
 
 @app.post("/api/upload")
 async def upload_pdf(file: UploadFile = File(...)):
+    """Upload PDF and store embeddings in vector database"""
     if not file.filename.lower().endswith('.pdf'):
         raise HTTPException(status_code=400, detail="Only PDF files are allowed")
 
-    return {"filename": file.filename}
+    try:
+        # Read PDF and generate embeddings
+        pdf_bytes = await file.read()
+        images = pdf_processor.pdf_to_images(pdf_bytes)
+        embeddings = colpali_model.embed_images(images)
+
+        # Prepare data for insertion
+        pdf_id = file.filename.replace('.pdf', '')
+        all_vectors = []
+        all_metadata = []
+
+        # Process embeddings for each page
+        for page_idx in range(len(images)):
+            page_embeddings = embeddings[page_idx]  # Shape: (num_patches, 128)
+
+            for patch_idx in range(len(page_embeddings)):
+                all_vectors.append(page_embeddings[patch_idx].cpu().numpy().tolist())
+                all_metadata.append({
+                    'pdf_id': pdf_id,
+                    'page_num': page_idx,
+                    'patch_index': patch_idx,
+                    'title': file.filename,
+                    'difficulty': 'unknown',
+                    'yarn_weight': 'unknown'
+                })
+
+        # Insert into database
+        db_adapter = get_database_adapter(VECTOR_DB_TYPE)
+        await db_adapter.connect()
+        await db_adapter.insert("patterns", all_vectors, all_metadata)
+        await db_adapter.disconnect()
+
+        return {
+            "filename": file.filename,
+            "pages": len(images),
+            "embeddings_stored": len(all_vectors),
+            "status": "success"
+        }
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error processing PDF: {str(e)}")
 
 @app.post("/api/search/text")
 async def search_text(request: TextSearchRequest):

@@ -97,7 +97,57 @@ class PostgresAdapter(VectorDatabase):
         metadata: List[Dict[str, Any]],
         ids: Optional[List[str]] = None
     ) -> None:
-        raise HTTPException(status_code=501, detail=f"{self.name}: insert not implemented")
+        """Insert vectors with metadata into the collection"""
+        if not self.pool:
+            await self.connect()
+
+        if len(vectors) != len(metadata):
+            raise HTTPException(
+                status_code=400,
+                detail="Number of vectors must match number of metadata entries"
+            )
+
+        try:
+            async with self.pool.acquire() as conn:
+                # Prepare batch insert data
+                insert_data = []
+                for i, (vector, meta) in enumerate(zip(vectors, metadata)):
+                    # Convert vector to string format for pgvector
+                    vector_str = '[' + ','.join(str(x) for x in vector) + ']'
+                    insert_data.append((
+                        meta.get('pdf_id', ''),
+                        meta.get('page_num', 0),
+                        meta.get('patch_index', i),
+                        vector_str,  # pgvector expects string format
+                        meta.get('title', None),
+                        meta.get('difficulty', None),
+                        meta.get('yarn_weight', None)
+                    ))
+
+                # Batch insert with explicit casting
+                insert_query = f"""
+                    INSERT INTO {collection_name}
+                    (pdf_id, page_num, patch_index, embedding, title, difficulty, yarn_weight)
+                    VALUES ($1, $2, $3, $4::vector, $5, $6, $7)
+                    ON CONFLICT (pdf_id, page_num, patch_index)
+                    DO UPDATE SET
+                        embedding = EXCLUDED.embedding,
+                        title = EXCLUDED.title,
+                        difficulty = EXCLUDED.difficulty,
+                        yarn_weight = EXCLUDED.yarn_weight,
+                        created_at = CURRENT_TIMESTAMP
+                """
+
+                # Execute batch insert
+                await conn.executemany(insert_query, insert_data)
+
+                print(f"Inserted {len(vectors)} vectors into '{collection_name}'")
+
+        except Exception as e:
+            raise HTTPException(
+                status_code=500,
+                detail=f"{self.name}: Failed to insert vectors - {str(e)}"
+            )
 
     async def search(
         self,
