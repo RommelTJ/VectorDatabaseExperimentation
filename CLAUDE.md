@@ -137,9 +137,9 @@ The generic interface should support:
 #### Phase 5A: Embeddings Preparation (One-time setup)
 1. **Create Training/Test Split** - Randomize 93 PDFs, select 80 for training, 13 for testing ✅
    - Created TrainingData.md with randomized split
-2. **Build Offline Ingestion Script** - Script to pre-embed training PDFs using ColPali
-3. **Generate Embeddings Cache** - Process all 80 training PDFs, save embeddings to `./embeddings/` directory
-4. **Verify Cache Format** - Ensure embeddings are loadable and contain expected dimensions
+2. **Build Offline Ingestion Script** - Script to pre-embed training PDFs using ColPali ✅
+3. **Generate Embeddings Cache** - Process all 80 training PDFs, save embeddings to `./embeddings/` directory ✅
+4. **Verify Cache Format** - Ensure embeddings are loadable and contain expected dimensions ✅
 
 #### Phase 5B: Database Implementation (Repeat for each database)
 
