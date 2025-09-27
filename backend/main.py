@@ -59,6 +59,25 @@ async def test_db_connection():
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+@app.post("/api/db/create-collection")
+async def create_collection(collection_name: str = "patterns"):
+    """Create a collection/table for storing vectors"""
+    try:
+        db_adapter = get_database_adapter(VECTOR_DB_TYPE)
+        await db_adapter.connect()
+        await db_adapter.create_collection(collection_name, dimension=128)  # ColPali uses 128 dimensions
+        await db_adapter.disconnect()
+        return {
+            "status": "success",
+            "database": VECTOR_DB_TYPE,
+            "collection": collection_name,
+            "message": f"Successfully created collection '{collection_name}' in {VECTOR_DB_TYPE}"
+        }
+    except HTTPException as e:
+        raise e
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
 class TextSearchRequest(BaseModel):
     query: str
     limit: int = 10

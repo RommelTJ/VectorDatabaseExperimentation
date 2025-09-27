@@ -45,7 +45,50 @@ class PostgresAdapter(VectorDatabase):
             )
 
     async def create_collection(self, collection_name: str, dimension: int) -> None:
-        raise HTTPException(status_code=501, detail=f"{self.name}: create_collection not implemented")
+        """Create a table for storing vectors with metadata"""
+        if not self.pool:
+            await self.connect()
+
+        try:
+            async with self.pool.acquire() as conn:
+                # Drop table if exists (for experimentation)
+                await conn.execute(f"DROP TABLE IF EXISTS {collection_name} CASCADE")
+
+                # Create table with vector column and metadata
+                create_table_query = f"""
+                    CREATE TABLE {collection_name} (
+                        id SERIAL PRIMARY KEY,
+                        pdf_id VARCHAR(255) NOT NULL,
+                        page_num INTEGER NOT NULL,
+                        patch_index INTEGER NOT NULL,
+                        embedding vector({dimension}) NOT NULL,
+                        title TEXT,
+                        difficulty VARCHAR(50),
+                        yarn_weight VARCHAR(50),
+                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                        UNIQUE(pdf_id, page_num, patch_index)
+                    )
+                """
+                await conn.execute(create_table_query)
+
+                # Create HNSW index for cosine similarity
+                create_index_query = f"""
+                    CREATE INDEX ON {collection_name}
+                    USING hnsw (embedding vector_cosine_ops)
+                    WITH (m = 16, ef_construction = 64)
+                """
+                await conn.execute(create_index_query)
+
+                # Create index on pdf_id for faster lookups/deletes
+                await conn.execute(f"CREATE INDEX ON {collection_name} (pdf_id)")
+
+                print(f"Created collection '{collection_name}' with dimension {dimension}")
+
+        except Exception as e:
+            raise HTTPException(
+                status_code=500,
+                detail=f"{self.name}: Failed to create collection - {str(e)}"
+            )
 
     async def insert(
         self,
