@@ -78,6 +78,27 @@ async def create_collection(collection_name: str = "patterns"):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+@app.delete("/api/db/delete-pdf/{pdf_id}")
+async def delete_pdf(pdf_id: str):
+    """Delete a PDF and all its embeddings from the database"""
+    try:
+        db_adapter = get_database_adapter(VECTOR_DB_TYPE)
+        await db_adapter.connect()
+        await db_adapter.delete("patterns", [pdf_id])
+        await db_adapter.disconnect()
+
+        return {
+            "status": "success",
+            "database": VECTOR_DB_TYPE,
+            "deleted_pdf": pdf_id,
+            "message": f"Successfully deleted PDF '{pdf_id}' from {VECTOR_DB_TYPE}"
+        }
+
+    except HTTPException as e:
+        raise e
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
 @app.post("/api/db/test-insert")
 async def test_insert_embeddings(num_pdfs: int = 2):
     """Test inserting embeddings from cache"""

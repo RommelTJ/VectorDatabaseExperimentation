@@ -209,7 +209,30 @@ class PostgresAdapter(VectorDatabase):
         collection_name: str,
         ids: List[str]
     ) -> None:
-        raise HTTPException(status_code=501, detail=f"{self.name}: delete not implemented")
+        """Delete vectors by pdf_id (cascading delete for all pages)"""
+        if not self.pool:
+            await self.connect()
+
+        try:
+            async with self.pool.acquire() as conn:
+                # Delete all rows matching the pdf_ids
+                delete_query = f"""
+                    DELETE FROM {collection_name}
+                    WHERE pdf_id = ANY($1::text[])
+                """
+
+                result = await conn.execute(delete_query, ids)
+
+                # Extract number of deleted rows from result string
+                rows_deleted = int(result.split()[-1]) if result else 0
+
+                print(f"Deleted {rows_deleted} vectors for {len(ids)} PDFs from '{collection_name}'")
+
+        except Exception as e:
+            raise HTTPException(
+                status_code=500,
+                detail=f"{self.name}: Failed to delete vectors - {str(e)}"
+            )
 
     async def disconnect(self) -> None:
         """Close the connection pool"""
