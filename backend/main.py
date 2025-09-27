@@ -203,14 +203,34 @@ async def upload_pdf(file: UploadFile = File(...)):
 
 @app.post("/api/search/text")
 async def search_text(request: TextSearchRequest):
+    """Search patterns using text query"""
     try:
+        # Generate embedding for query
+        query_embeddings = colpali_model.embed_queries([request.query])
+
+        # ColPali returns shape (1, num_patches, 128) for queries
+        # We need to flatten to get all patch embeddings and average them
+        query_tensor = query_embeddings[0]  # Remove batch dimension
+
+        # Average across all patches to get a single 128-dim vector
+        import torch
+        query_vector = torch.mean(query_tensor, dim=0).cpu().numpy().tolist()
+
+        # Search in database
         db_adapter = get_database_adapter(VECTOR_DB_TYPE)
+        await db_adapter.connect()
         results = await db_adapter.search(
             collection_name="patterns",
-            query_vector=[0.0] * 128,
+            query_vector=query_vector,
             top_k=request.limit
         )
-        return {"results": results}
+        await db_adapter.disconnect()
+
+        return {
+            "query": request.query,
+            "results": results,
+            "count": len(results)
+        }
     except HTTPException as e:
         raise e
     except Exception as e:

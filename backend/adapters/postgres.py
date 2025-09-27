@@ -156,7 +156,53 @@ class PostgresAdapter(VectorDatabase):
         top_k: int = 10,
         filter: Optional[Dict[str, Any]] = None
     ) -> List[Dict[str, Any]]:
-        raise HTTPException(status_code=501, detail=f"{self.name}: search not implemented")
+        """Search for similar vectors using cosine similarity"""
+        if not self.pool:
+            await self.connect()
+
+        try:
+            async with self.pool.acquire() as conn:
+                # Convert query vector to string format
+                query_vector_str = '[' + ','.join(str(x) for x in query_vector) + ']'
+
+                # Build search query with cosine similarity
+                search_query = f"""
+                    SELECT
+                        pdf_id,
+                        page_num,
+                        patch_index,
+                        title,
+                        difficulty,
+                        yarn_weight,
+                        1 - (embedding <=> $1::vector) as similarity
+                    FROM {collection_name}
+                    ORDER BY embedding <=> $1::vector
+                    LIMIT $2
+                """
+
+                # Execute search
+                rows = await conn.fetch(search_query, query_vector_str, top_k)
+
+                # Format results
+                results = []
+                for row in rows:
+                    results.append({
+                        'pdf_id': row['pdf_id'],
+                        'page_num': row['page_num'],
+                        'patch_index': row['patch_index'],
+                        'title': row['title'],
+                        'difficulty': row['difficulty'],
+                        'yarn_weight': row['yarn_weight'],
+                        'score': float(row['similarity'])
+                    })
+
+                return results
+
+        except Exception as e:
+            raise HTTPException(
+                status_code=500,
+                detail=f"{self.name}: Failed to search - {str(e)}"
+            )
 
     async def delete(
         self,
