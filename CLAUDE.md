@@ -169,7 +169,7 @@ The generic interface should support:
 - Implement proper error handling and retries
 - **Verification**: Insert 2-3 test PDFs, query database directly to verify data
 
-##### Step 5: Search Implementation
+##### Step 5: Search Implementation ✅
 - Implement `search()` for text queries
 - Support configurable k (top-k results)
 - Use cosine similarity as default metric
