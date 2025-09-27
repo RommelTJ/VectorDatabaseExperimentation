@@ -162,7 +162,7 @@ The generic interface should support:
 - Define schema for metadata fields
 - **Verification**: Check collection exists in database, verify schema
 
-##### Step 4: Insert Implementation
+##### Step 4: Insert Implementation ✅
 - Implement `insert()` method with batch support
 - Load embeddings from cache directory
 - Handle metadata (pdf_id, page_num, title, etc.)
