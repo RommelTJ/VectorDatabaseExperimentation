@@ -42,6 +42,23 @@ async def get_config():
         ]
     }
 
+@app.get("/api/db/test-connection")
+async def test_db_connection():
+    """Test database connection"""
+    try:
+        db_adapter = get_database_adapter(VECTOR_DB_TYPE)
+        await db_adapter.connect()
+        await db_adapter.disconnect()
+        return {
+            "status": "success",
+            "database": VECTOR_DB_TYPE,
+            "message": f"Successfully connected to {VECTOR_DB_TYPE}"
+        }
+    except HTTPException as e:
+        raise e
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
 class TextSearchRequest(BaseModel):
     query: str
     limit: int = 10
