@@ -8,7 +8,9 @@ function App() {
   const [uploadStatus, setUploadStatus] = useState<string>('')
   const [textQuery, setTextQuery] = useState<string>('')
   const [textSearchStatus, setTextSearchStatus] = useState<string>('')
+  const [textSearchResults, setTextSearchResults] = useState<any[]>([])
   const [imageSearchStatus, setImageSearchStatus] = useState<string>('')
+  const [imageSearchResults, setImageSearchResults] = useState<any[]>([])
   const fileInputRef = useRef<HTMLInputElement>(null)
   const imageInputRef = useRef<HTMLInputElement>(null)
   const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:8000'
@@ -103,12 +105,18 @@ function App() {
         })
       })
 
-      if (!response.ok) {
+      if (response.ok) {
+        const data = await response.json()
+        setTextSearchResults(data.results || [])
+        setTextSearchStatus(`Found ${data.count || 0} results`)
+      } else {
         const error = await response.json()
         setTextSearchStatus(`Error: ${error.detail || 'Search failed'}`)
+        setTextSearchResults([])
       }
     } catch (error) {
       setTextSearchStatus(`Error: ${error}`)
+      setTextSearchResults([])
     }
   }
 
@@ -126,12 +134,18 @@ function App() {
         body: formData
       })
 
-      if (!response.ok) {
+      if (response.ok) {
+        const data = await response.json()
+        setImageSearchResults(data.results || [])
+        setImageSearchStatus(`Found ${data.count || 0} results`)
+      } else {
         const error = await response.json()
         setImageSearchStatus(`Error: ${error.detail || 'Search failed'}`)
+        setImageSearchResults([])
       }
     } catch (error) {
       setImageSearchStatus(`Error: ${error}`)
+      setImageSearchResults([])
     }
   }
 
@@ -212,6 +226,26 @@ function App() {
               {textSearchStatus}
             </p>
           )}
+
+          {textSearchResults.length > 0 && (
+            <div style={{ marginTop: '20px' }}>
+              <h4>Search Results:</h4>
+              {textSearchResults.map((result, index) => (
+                <div key={index} style={{
+                  padding: '10px',
+                  marginBottom: '10px',
+                  borderRadius: '4px',
+                  backgroundColor: '#f5f5f5',
+                  border: '1px solid #ddd'
+                }}>
+                  <div><strong>PDF:</strong> {result.title}</div>
+                  <div><strong>Page:</strong> {result.page_num + 1}</div>
+                  <div><strong>Score:</strong> {result.score.toFixed(4)}</div>
+                  <div><strong>PDF ID:</strong> {result.pdf_id}</div>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
 
         <div>
@@ -246,6 +280,26 @@ function App() {
             }}>
               {imageSearchStatus}
             </p>
+          )}
+
+          {imageSearchResults.length > 0 && (
+            <div style={{ marginTop: '20px' }}>
+              <h4>Image Search Results:</h4>
+              {imageSearchResults.map((result, index) => (
+                <div key={index} style={{
+                  padding: '10px',
+                  marginBottom: '10px',
+                  borderRadius: '4px',
+                  backgroundColor: '#f5f5f5',
+                  border: '1px solid #ddd'
+                }}>
+                  <div><strong>PDF:</strong> {result.title}</div>
+                  <div><strong>Page:</strong> {result.page_num + 1}</div>
+                  <div><strong>Score:</strong> {result.score.toFixed(4)}</div>
+                  <div><strong>PDF ID:</strong> {result.pdf_id}</div>
+                </div>
+              ))}
+            </div>
           )}
         </div>
       </div>

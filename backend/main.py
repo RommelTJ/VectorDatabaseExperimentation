@@ -259,17 +259,44 @@ async def search_text(request: TextSearchRequest):
 
 @app.post("/api/search/image")
 async def search_image(file: UploadFile = File(...)):
+    """Search patterns using an image"""
     if not file.content_type.startswith('image/'):
         raise HTTPException(status_code=400, detail="Only image files are allowed")
 
     try:
+        # Read image and generate embedding
+        from PIL import Image
+        import io
+
+        image_bytes = await file.read()
+        image = Image.open(io.BytesIO(image_bytes))
+
+        # Convert to RGB if needed
+        if image.mode != 'RGB':
+            image = image.convert('RGB')
+
+        # Generate embedding for image using ColPali
+        embeddings = colpali_model.embed_images([image])
+
+        # Average all patch embeddings to get a single vector
+        import torch
+        query_tensor = embeddings[0]  # Shape: (num_patches, 128)
+        query_vector = torch.mean(query_tensor, dim=0).cpu().numpy().tolist()
+
+        # Search in database
         db_adapter = get_database_adapter(VECTOR_DB_TYPE)
+        await db_adapter.connect()
         results = await db_adapter.search(
             collection_name="patterns",
-            query_vector=[0.0] * 128,
+            query_vector=query_vector,
             top_k=10
         )
-        return {"results": results}
+        await db_adapter.disconnect()
+
+        return {
+            "results": results,
+            "count": len(results)
+        }
     except HTTPException as e:
         raise e
     except Exception as e:
