@@ -2,7 +2,7 @@
 
 Experimenting with embeddings and vector databases
 
-Version: 0.2.0 - 27 Sep 2025
+Version: 0.3.0 - 28 Sep 2025
 
 ## Quick Start
 
