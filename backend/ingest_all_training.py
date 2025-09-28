@@ -77,9 +77,7 @@ async def ingest_all_training_data():
                     'pdf_id': pdf_id,
                     'page_num': page_idx,
                     'patch_index': patch_idx,
-                    'title': pdf_name,
-                    'difficulty': 'unknown',
-                    'yarn_weight': 'unknown'
+                    'title': pdf_name
                 })
 
             # Convert embeddings to list format
