@@ -63,8 +63,6 @@ class PostgresAdapter(VectorDatabase):
                         patch_index INTEGER NOT NULL,
                         embedding vector({dimension}) NOT NULL,
                         title TEXT,
-                        difficulty VARCHAR(50),
-                        yarn_weight VARCHAR(50),
                         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                         UNIQUE(pdf_id, page_num, patch_index)
                     )
@@ -119,22 +117,18 @@ class PostgresAdapter(VectorDatabase):
                         meta.get('page_num', 0),
                         meta.get('patch_index', i),
                         vector_str,  # pgvector expects string format
-                        meta.get('title', None),
-                        meta.get('difficulty', None),
-                        meta.get('yarn_weight', None)
+                        meta.get('title', None)
                     ))
 
                 # Batch insert with explicit casting
                 insert_query = f"""
                     INSERT INTO {collection_name}
-                    (pdf_id, page_num, patch_index, embedding, title, difficulty, yarn_weight)
-                    VALUES ($1, $2, $3, $4::vector, $5, $6, $7)
+                    (pdf_id, page_num, patch_index, embedding, title)
+                    VALUES ($1, $2, $3, $4::vector, $5)
                     ON CONFLICT (pdf_id, page_num, patch_index)
                     DO UPDATE SET
                         embedding = EXCLUDED.embedding,
                         title = EXCLUDED.title,
-                        difficulty = EXCLUDED.difficulty,
-                        yarn_weight = EXCLUDED.yarn_weight,
                         created_at = CURRENT_TIMESTAMP
                 """
 
@@ -175,8 +169,6 @@ class PostgresAdapter(VectorDatabase):
                             page_num,
                             patch_index,
                             title,
-                            difficulty,
-                            yarn_weight,
                             1 - (embedding <=> $1::vector) as similarity
                         FROM {collection_name}
                         ORDER BY embedding <=> $1::vector
@@ -196,8 +188,6 @@ class PostgresAdapter(VectorDatabase):
                         page_num,
                         patch_index,
                         title,
-                        difficulty,
-                        yarn_weight,
                         similarity
                     FROM ranked_patches
                     WHERE rn = 1
@@ -216,8 +206,6 @@ class PostgresAdapter(VectorDatabase):
                         'page_num': row['page_num'],
                         'patch_index': row['patch_index'],
                         'title': row['title'],
-                        'difficulty': row['difficulty'],
-                        'yarn_weight': row['yarn_weight'],
                         'score': float(row['similarity'])
                     })
 
