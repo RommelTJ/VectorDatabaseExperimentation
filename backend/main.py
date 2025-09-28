@@ -1,8 +1,10 @@
 from fastapi import FastAPI, File, UploadFile, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse
 from pydantic import BaseModel
 import os
 import logging
+from PIL import Image
 from adapters import get_database_adapter
 from colpali_model import colpali_model
 from pdf_processor import pdf_processor
@@ -198,6 +200,25 @@ async def upload_pdf(file: UploadFile = File(...)):
 
         # Prepare data for insertion
         pdf_id = file.filename.replace('.pdf', '')
+
+        # Save cover page as thumbnail
+        import os
+        from pathlib import Path
+        thumbnail_dir = Path("/app/data/thumbnails")
+        thumbnail_dir.mkdir(parents=True, exist_ok=True)
+
+        cover_thumbnail = images[0]  # First page (cover)
+        thumbnail_path = thumbnail_dir / f"{pdf_id}.jpg"
+
+        # Resize to smaller thumbnail (max width 300px, maintain aspect ratio)
+        max_width = 300
+        aspect_ratio = cover_thumbnail.height / cover_thumbnail.width
+        new_width = min(cover_thumbnail.width, max_width)
+        new_height = int(new_width * aspect_ratio)
+
+        resized_thumbnail = cover_thumbnail.resize((new_width, new_height), Image.Resampling.LANCZOS)
+        resized_thumbnail.save(thumbnail_path, "JPEG", quality=85, optimize=True)
+
         all_vectors = []
         all_metadata = []
 
