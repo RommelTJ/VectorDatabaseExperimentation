@@ -154,9 +154,7 @@ async def test_insert_embeddings(num_pdfs: int = 2):
                         'pdf_id': pdf_id,
                         'page_num': page_idx,
                         'patch_index': patch_idx,
-                        'title': pdf_name,
-                        'difficulty': 'unknown',
-                        'yarn_weight': 'unknown'
+                        'title': pdf_name
                     })
 
                 # Convert embeddings to list format
@@ -213,9 +211,7 @@ async def upload_pdf(file: UploadFile = File(...)):
                     'pdf_id': pdf_id,
                     'page_num': page_idx,
                     'patch_index': patch_idx,
-                    'title': file.filename,
-                    'difficulty': 'unknown',
-                    'yarn_weight': 'unknown'
+                    'title': file.filename
                 })
 
         # Insert into database
