@@ -379,3 +379,26 @@ async def embed_query(request: TextSearchRequest):
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error embedding query: {str(e)}")
+
+@app.get("/api/thumbnails/{pdf_id}")
+async def get_thumbnail(pdf_id: str):
+    """Serve thumbnail image for a PDF"""
+    from pathlib import Path
+
+    # Check in Docker container path
+    thumbnail_path = Path(f"/app/data/thumbnails/{pdf_id}.jpg")
+
+    if not thumbnail_path.exists():
+        # Fallback: try without .pdf extension if it was included
+        if pdf_id.endswith('.pdf'):
+            pdf_id = pdf_id.replace('.pdf', '')
+            thumbnail_path = Path(f"/app/data/thumbnails/{pdf_id}.jpg")
+
+        if not thumbnail_path.exists():
+            raise HTTPException(status_code=404, detail="Thumbnail not found")
+
+    return FileResponse(
+        path=str(thumbnail_path),
+        media_type="image/jpeg",
+        headers={"Cache-Control": "public, max-age=3600"}
+    )
