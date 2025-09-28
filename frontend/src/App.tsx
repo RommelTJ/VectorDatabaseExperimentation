@@ -264,17 +264,68 @@ function App() {
             <h4>Search Results:</h4>
             {searchResults.map((result, index) => (
               <div key={index} style={{
-                padding: '10px',
-                marginBottom: '10px',
-                borderRadius: '4px',
+                padding: '15px',
+                marginBottom: '15px',
+                borderRadius: '8px',
                 backgroundColor: '#f5f5f5',
                 border: '1px solid #ddd',
-                color: '#333'
+                color: '#333',
+                display: 'flex',
+                gap: '15px'
               }}>
-                <div><strong>PDF:</strong> {result.title}</div>
-                <div><strong>Page:</strong> {result.page_num + 1}</div>
-                <div><strong>Score:</strong> {result.score.toFixed(4)}</div>
-                <div><strong>PDF ID:</strong> {result.pdf_id}</div>
+                {/* Thumbnail */}
+                <div style={{
+                  flexShrink: 0,
+                  width: '120px',
+                  height: '155px',
+                  backgroundColor: '#e0e0e0',
+                  borderRadius: '4px',
+                  overflow: 'hidden'
+                }}>
+                  <img
+                    src={`${apiUrl}/api/thumbnails/${result.pdf_id}`}
+                    alt={result.title}
+                    style={{
+                      width: '100%',
+                      height: '100%',
+                      objectFit: 'cover'
+                    }}
+                    onError={(e) => {
+                      // Fallback if thumbnail doesn't exist
+                      e.currentTarget.style.display = 'none';
+                      e.currentTarget.parentElement!.innerHTML = `
+                        <div style="display: flex; align-items: center; justify-content: center; height: 100%; color: #999; font-size: 12px; text-align: center; padding: 10px;">
+                          No thumbnail available
+                        </div>
+                      `;
+                    }}
+                  />
+                </div>
+
+                {/* Result Details */}
+                <div style={{ flex: 1 }}>
+                  <div style={{
+                    fontSize: '16px',
+                    fontWeight: 'bold',
+                    marginBottom: '8px',
+                    color: '#333'
+                  }}>
+                    {result.title}
+                  </div>
+                  <div style={{
+                    fontSize: '14px',
+                    color: '#666',
+                    marginBottom: '4px'
+                  }}>
+                    Match on page {result.page_num + 1}
+                  </div>
+                  <div style={{
+                    fontSize: '13px',
+                    color: '#999'
+                  }}>
+                    Relevance score: {result.score.toFixed(4)}
+                  </div>
+                </div>
               </div>
             ))}
           </div>
