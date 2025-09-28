@@ -165,8 +165,32 @@ class PostgresAdapter(VectorDatabase):
                 # Convert query vector to string format
                 query_vector_str = '[' + ','.join(str(x) for x in query_vector) + ']'
 
-                # Build search query with cosine similarity
+                # Build search query that deduplicates at document level
+                # First get top candidate patches (3x the requested amount to ensure enough unique docs)
+                # Then deduplicate by selecting best patch per document
                 search_query = f"""
+                    WITH top_patches AS (
+                        SELECT
+                            pdf_id,
+                            page_num,
+                            patch_index,
+                            title,
+                            difficulty,
+                            yarn_weight,
+                            1 - (embedding <=> $1::vector) as similarity
+                        FROM {collection_name}
+                        ORDER BY embedding <=> $1::vector
+                        LIMIT $2 * 3
+                    ),
+                    ranked_patches AS (
+                        SELECT
+                            *,
+                            ROW_NUMBER() OVER (
+                                PARTITION BY pdf_id
+                                ORDER BY similarity DESC
+                            ) as rn
+                        FROM top_patches
+                    )
                     SELECT
                         pdf_id,
                         page_num,
@@ -174,9 +198,10 @@ class PostgresAdapter(VectorDatabase):
                         title,
                         difficulty,
                         yarn_weight,
-                        1 - (embedding <=> $1::vector) as similarity
-                    FROM {collection_name}
-                    ORDER BY embedding <=> $1::vector
+                        similarity
+                    FROM ranked_patches
+                    WHERE rn = 1
+                    ORDER BY similarity DESC
                     LIMIT $2
                 """
 
