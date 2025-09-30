@@ -51,20 +51,21 @@ docker exec -it vectordatabaseexperimentation-backend-1 pip install docker
 
 ---
 
-### 4. Storage Analysis (Disk Usage)
+---
 
-Measures disk space consumed by embeddings cache, database tables/indexes, and Docker volumes.
+## Storage Analysis (Manual)
+
+Check Docker volume sizes to compare storage overhead between databases:
 
 ```bash
-docker exec -it vectordatabaseexperimentation-backend-1 python scripts/storage_analysis.py
+# View all volume sizes
+docker system df -v
+
+# Or check specific volumes
+docker volume ls
 ```
 
-**Output**: `storage_analysis_results.json` with storage breakdown
-
-**Note**: For Docker volume measurements, you may need sudo permissions:
-```bash
-sudo docker exec -it vectordatabaseexperimentation-backend-1 python scripts/storage_analysis.py
-```
+**Note**: Embeddings size is constant (~217MB), but index overhead and metadata storage varies by database.
 
 ---
 
@@ -76,31 +77,29 @@ To run the complete benchmark suite sequentially:
 # Run all performance tests
 docker exec -it vectordatabaseexperimentation-backend-1 python scripts/benchmark_search.py && \
 docker exec -it vectordatabaseexperimentation-backend-1 python scripts/load_test.py && \
-docker exec -it vectordatabaseexperimentation-backend-1 python scripts/memory_monitor.py && \
-docker exec -it vectordatabaseexperimentation-backend-1 python scripts/storage_analysis.py
+docker exec -it vectordatabaseexperimentation-backend-1 python scripts/memory_monitor.py
 
-# View results
-docker exec -it vectordatabaseexperimentation-backend-1 ls -lh *.json
+# View results (they're saved in the container's /app directory)
+docker exec -it vectordatabaseexperimentation-backend-1 ls -lh /app/*.json 2>/dev/null || echo "No results found yet"
 ```
 
 ---
 
 ## Viewing Results
 
-All scripts output JSON files to the backend container's working directory. To view results:
+All scripts output JSON files to the backend container's `/app` directory. To view results:
 
 ```bash
 # List result files
-docker exec -it vectordatabaseexperimentation-backend-1 ls -lh *_results.json
+docker exec vectordatabaseexperimentation-backend-1 sh -c 'ls -lh /app/*_results.json'
 
 # View specific result file
-docker exec -it vectordatabaseexperimentation-backend-1 cat benchmark_results.json | jq .
+docker exec vectordatabaseexperimentation-backend-1 cat /app/benchmark_results.json | jq .
 
 # Copy results to host
 docker cp vectordatabaseexperimentation-backend-1:/app/benchmark_results.json ./
 docker cp vectordatabaseexperimentation-backend-1:/app/load_test_results.json ./
 docker cp vectordatabaseexperimentation-backend-1:/app/memory_monitoring_results.json ./
-docker cp vectordatabaseexperimentation-backend-1:/app/storage_analysis_results.json ./
 ```
 
 ---
@@ -122,12 +121,6 @@ docker cp vectordatabaseexperimentation-backend-1:/app/storage_analysis_results.
 - **Peak usage**: Maximum RAM during operations
 - **Mean usage**: Average RAM consumption
 - **Delta**: Memory increase during query workload
-
-### Storage Analysis
-- **Embeddings cache**: Raw embedding storage (numpy arrays)
-- **Database size**: Vector data + metadata in database
-- **Index overhead**: Additional space for HNSW indexes
-- **Per-pattern average**: Storage efficiency per PDF
 
 ---
 
@@ -162,10 +155,6 @@ docker exec -it vectordatabaseexperimentation-backend-1 python scripts/memory_mo
 ### Memory monitoring shows system stats instead of container stats
 - Install docker package: `docker exec -it vectordatabaseexperimentation-backend-1 pip install docker`
 - Or accept system-wide stats (less accurate but functional)
-
-### Storage analysis permission errors
-- Run with sudo for Docker volume measurements
-- Or skip volume measurements and focus on database/embeddings sizes
 
 ### Scripts not found
 - Verify you're in the project root directory
