@@ -123,9 +123,18 @@ curl -X DELETE "http://localhost:8000/api/db/delete-pdf/10.1.21_Knot%20Your%20Ma
 docker exec -it vectordatabaseexperimentation-postgres-1 psql -U vectordb -d knitting_patterns -c "SELECT pdf_id, COUNT(*) FROM patterns GROUP BY pdf_id;"
 ```
 
-#### Performance Results
+#### Performance Evaluation
 
-- **Full Ingestion**: 423,741 embeddings in 305.91 seconds
-- **Average Speed**: 1,385 embeddings/second
-- **Average per PDF**: 3.82 seconds
-- **Search Latency**: < 100ms for top-5 results
+**Full evaluation results**: [POSTGRES_EVALUATION.md](./POSTGRES_EVALUATION.md)
+
+**Quick Summary**:
+- **Ingestion**: 1,385 embeddings/sec
+- **Query latency**: p50=1,156ms (mostly ColPali embedding generation, <100ms for actual DB search)
+- **Concurrency**: 100% success rate, stable throughput under load
+- **Memory**: 12.6GB peak (dominated by ColPali model)
+- **Storage**: 1.58GB for 423K vectors (6.3x index overhead)
+
+**Ratings**:
+- Practicality: ⭐⭐⭐⭐⭐ (5/5) - Would use again
+- Learnings: ⭐⭐⭐⭐ (4/5) - SQL + vectors is powerful
+- Fun: ⭐⭐⭐⭐ (4/5) - Smooth, familiar experience
