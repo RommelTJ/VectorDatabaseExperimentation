@@ -13,13 +13,13 @@ services:
       - POSTGRES_USER=vectordb
       - POSTGRES_PASSWORD=vectordb123
       - POSTGRES_DB=knitting_patterns
+      - QDRANT_HOST=qdrant
+      - QDRANT_PORT=6333
     volumes:
       - huggingface-cache:/root/.cache/huggingface
       - ./data:/app/data  # Mount data directory (PDFs and embeddings)
     networks:
       - app-network
-    depends_on:
-      - postgres
     deploy:
       resources:
         limits:
