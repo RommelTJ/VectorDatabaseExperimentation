@@ -1,4 +1,7 @@
 from typing import List, Dict, Any, Optional
+import os
+from qdrant_client import QdrantClient
+from qdrant_client.models import Distance, VectorParams
 from fastapi import HTTPException
 from .base import VectorDatabase
 
@@ -6,12 +9,57 @@ from .base import VectorDatabase
 class QdrantAdapter(VectorDatabase):
     def __init__(self):
         self.name = "Qdrant"
+        self.client = None
+        self.host = os.getenv("QDRANT_HOST", "localhost")
+        self.port = int(os.getenv("QDRANT_PORT", "6333"))
 
     async def connect(self) -> None:
-        raise HTTPException(status_code=501, detail=f"{self.name}: connect not implemented")
+        """Connect to Qdrant server"""
+        try:
+            # Create Qdrant client (uses HTTP by default)
+            self.client = QdrantClient(
+                host=self.host,
+                port=self.port,
+                timeout=60
+            )
+
+            # Test connection by getting health status
+            health = self.client.get_health()
+            print(f"Connected to Qdrant: {health}")
+
+        except Exception as e:
+            raise HTTPException(
+                status_code=500,
+                detail=f"{self.name}: Failed to connect - {str(e)}"
+            )
 
     async def create_collection(self, collection_name: str, dimension: int) -> None:
-        raise HTTPException(status_code=501, detail=f"{self.name}: create_collection not implemented")
+        """Create a collection for storing vectors with metadata"""
+        if not self.client:
+            await self.connect()
+
+        try:
+            # Delete collection if exists (for experimentation)
+            collections = self.client.get_collections().collections
+            if any(col.name == collection_name for col in collections):
+                self.client.delete_collection(collection_name=collection_name)
+
+            # Create collection with vector configuration
+            self.client.create_collection(
+                collection_name=collection_name,
+                vectors_config=VectorParams(
+                    size=dimension,
+                    distance=Distance.COSINE
+                )
+            )
+
+            print(f"Created collection '{collection_name}' with dimension {dimension}")
+
+        except Exception as e:
+            raise HTTPException(
+                status_code=500,
+                detail=f"{self.name}: Failed to create collection - {str(e)}"
+            )
 
     async def insert(
         self,
