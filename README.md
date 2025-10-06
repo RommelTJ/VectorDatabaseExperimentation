@@ -6,10 +6,32 @@ Version: 0.7.0 - 30 Sep 2025
 
 ## Quick Start
 
+### Switching Between Databases
+
+This project uses Docker Compose profiles to run one database at a time:
+
+```bash
+# Run with Postgres (default)
+VECTOR_DB_TYPE=postgres docker-compose --profile postgres up --build
+
+# Run with Qdrant
+VECTOR_DB_TYPE=qdrant docker-compose --profile qdrant up --build
+
+# Future databases will follow the same pattern:
+# VECTOR_DB_TYPE=redis docker-compose --profile redis up --build
+```
+
+**What runs with each command:**
+- `backend` service (always)
+- `frontend` service (always)
+- Database service for the selected profile only
+
+**Why profiles?** Running all 7 databases simultaneously would consume too much disk space and memory. Profiles ensure only the database you're testing is active.
+
 ### Running the Application
 ```bash
-# Start all services
-docker-compose up
+# Start all services (using default postgres profile)
+VECTOR_DB_TYPE=postgres docker-compose --profile postgres up --build
 
 # Frontend will be available at http://localhost:3000
 # Backend API at http://localhost:8000
@@ -68,7 +90,7 @@ totally arbitrary preference.
 
 ```bash
 # Start the Postgres service
-docker-compose up -d postgres
+VECTOR_DB_TYPE=postgres docker-compose --profile postgres up -d
 
 # Check logs
 docker-compose logs postgres
