@@ -87,4 +87,7 @@ class QdrantAdapter(VectorDatabase):
         raise HTTPException(status_code=501, detail=f"{self.name}: delete not implemented")
 
     async def disconnect(self) -> None:
-        raise HTTPException(status_code=501, detail=f"{self.name}: disconnect not implemented")
+        """Close the connection"""
+        if self.client:
+            self.client.close()
+            print(f"Disconnected from Qdrant")
