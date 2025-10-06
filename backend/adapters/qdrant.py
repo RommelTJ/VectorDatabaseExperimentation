@@ -23,9 +23,9 @@ class QdrantAdapter(VectorDatabase):
                 timeout=60
             )
 
-            # Test connection by getting health status
-            health = self.client.get_health()
-            print(f"Connected to Qdrant: {health}")
+            # Test connection by getting collections (returns empty list if none exist)
+            collections = self.client.get_collections()
+            print(f"Connected to Qdrant: {len(collections.collections)} collections found")
 
         except Exception as e:
             raise HTTPException(
