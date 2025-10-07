@@ -170,3 +170,105 @@ du -sh ./data/embeddings
 - Practicality: ⭐⭐⭐⭐⭐ (5/5) - Would use again
 - Learnings: ⭐⭐⭐⭐ (4/5) - SQL + vectors is powerful
 - Fun: ⭐⭐⭐⭐ (4/5) - Smooth, familiar experience
+
+### Qdrant
+
+#### Setup and Basic Operations
+
+```bash
+# Start the Qdrant service
+VECTOR_DB_TYPE=qdrant docker-compose --profile qdrant up -d
+
+# Check logs
+docker-compose logs qdrant
+
+# Test database connection
+curl http://localhost:8000/api/db/test-connection
+
+# Create the vector collection
+curl -X POST http://localhost:8000/api/db/create-collection
+
+# Verify collection (via Qdrant API)
+curl http://localhost:6333/collections/patterns
+
+# Or use Qdrant dashboard at http://localhost:6333/dashboard
+```
+
+#### Data Ingestion
+
+```bash
+# Insert a few test PDFs from cache
+curl -X POST "http://localhost:8000/api/db/test-insert?num_pdfs=2"
+
+# Check inserted data (via Qdrant API)
+curl -X POST http://localhost:6333/collections/patterns/points/scroll -H "Content-Type: application/json" -d '{"limit": 10}'
+
+# Full ingestion of all 80 training PDFs
+docker-compose exec backend python ingest_all_training.py
+
+# Verify total count (should be 423,741 embeddings)
+curl http://localhost:6333/collections/patterns | jq '.result.points_count'
+```
+
+#### Search Operations
+
+```bash
+# Text search
+curl -X POST http://localhost:8000/api/search/text \
+  -H "Content-Type: application/json" \
+  -d '{"query": "cable knit pattern", "limit": 5}'
+
+# Search for scarf patterns
+curl -X POST http://localhost:8000/api/search/text \
+  -H "Content-Type: application/json" \
+  -d '{"query": "scarf", "limit": 5}'
+```
+
+#### Delete Operations
+
+```bash
+# Delete a specific PDF (URL-encode spaces as %20)
+curl -X DELETE "http://localhost:8000/api/db/delete-pdf/10.1.21_Knot%20Your%20Mamas%20Headband"
+
+# Verify deletion (via search)
+curl -X POST http://localhost:8000/api/search/text \
+  -H "Content-Type: application/json" \
+  -d '{"query": "headband", "limit": 5}'
+```
+
+#### Storage Usage
+
+```bash
+# Check Qdrant volume size
+docker-compose exec qdrant du -sh /qdrant/storage
+
+# Compare to embeddings cache baseline
+du -sh ./data/embeddings
+```
+
+#### Performance Benchmarking
+
+```bash
+# Query latency test (p50, p95, p99)
+docker-compose exec backend python scripts/benchmark_search.py
+
+# Concurrent load test
+docker-compose exec backend python scripts/load_test.py
+
+# Memory monitoring (run in separate terminal during load test)
+docker-compose exec backend python scripts/memory_monitor.py
+```
+
+#### Performance Evaluation
+
+**Full evaluation results**: TBD - QDRANT_EVALUATION.md
+
+**Quick Summary**:
+- **Ingestion**: 22,954 embeddings/sec (16.6x faster than Postgres!)
+- **Query latency**: p50=1,190ms (mostly ColPali embedding generation, <10ms for actual DB search)
+- **Concurrency**: 96% success rate at 10 users (4 failures out of 100)
+- **Memory**: 13.0GB peak (dominated by ColPali model)
+- **Storage**: 360MB for 423K vectors (1.66x overhead, 4.4x smaller than Postgres!)
+
+**Ratings**:
+- TBD
