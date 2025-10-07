@@ -2,7 +2,7 @@ from typing import List, Dict, Any, Optional
 import os
 import hashlib
 from qdrant_client import QdrantClient
-from qdrant_client.models import Distance, VectorParams, PointStruct
+from qdrant_client.models import Distance, VectorParams, PointStruct, Filter, FieldCondition, MatchAny
 from fastapi import HTTPException
 from .base import VectorDatabase
 
@@ -176,7 +176,32 @@ class QdrantAdapter(VectorDatabase):
         collection_name: str,
         ids: List[str]
     ) -> None:
-        raise HTTPException(status_code=501, detail=f"{self.name}: delete not implemented")
+        """Delete vectors by pdf_id (cascading delete for all pages)"""
+        if not self.client:
+            await self.connect()
+
+        try:
+            # Delete all points matching any of the pdf_ids
+            # Using MatchAny to match multiple pdf_ids
+            self.client.delete(
+                collection_name=collection_name,
+                points_selector=Filter(
+                    must=[
+                        FieldCondition(
+                            key="pdf_id",
+                            match=MatchAny(any=ids)
+                        )
+                    ]
+                )
+            )
+
+            print(f"Deleted vectors for {len(ids)} PDFs from '{collection_name}'")
+
+        except Exception as e:
+            raise HTTPException(
+                status_code=500,
+                detail=f"{self.name}: Failed to delete vectors - {str(e)}"
+            )
 
     async def disconnect(self) -> None:
         """Close the connection"""
