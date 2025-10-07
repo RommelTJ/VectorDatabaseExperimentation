@@ -133,7 +133,43 @@ class QdrantAdapter(VectorDatabase):
         top_k: int = 10,
         filter: Optional[Dict[str, Any]] = None
     ) -> List[Dict[str, Any]]:
-        raise HTTPException(status_code=501, detail=f"{self.name}: search not implemented")
+        """Search for similar vectors using cosine similarity"""
+        if not self.client:
+            await self.connect()
+
+        try:
+            # Search for top candidates (3x to ensure enough unique documents)
+            search_results = self.client.search(
+                collection_name=collection_name,
+                query_vector=query_vector,
+                limit=top_k * 3
+            )
+
+            # Deduplicate by pdf_id - keep best scoring patch per document
+            seen_pdfs = {}
+            for result in search_results:
+                pdf_id = result.payload.get('pdf_id')
+
+                # Keep the first (highest scoring) result for each pdf_id
+                if pdf_id not in seen_pdfs:
+                    seen_pdfs[pdf_id] = {
+                        'pdf_id': pdf_id,
+                        'page_num': result.payload.get('page_num'),
+                        'patch_index': result.payload.get('patch_index'),
+                        'title': result.payload.get('title'),
+                        'score': result.score
+                    }
+
+            # Convert to list and take top_k
+            results = list(seen_pdfs.values())[:top_k]
+
+            return results
+
+        except Exception as e:
+            raise HTTPException(
+                status_code=500,
+                detail=f"{self.name}: Failed to search - {str(e)}"
+            )
 
     async def delete(
         self,
