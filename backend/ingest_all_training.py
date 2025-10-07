@@ -121,10 +121,20 @@ async def ingest_all_training_data():
     print(f"Average speed: {total_embeddings/total_time:.1f} embeddings/sec")
     print(f"Average per PDF: {total_time/len(embedding_files):.2f} seconds")
 
-    # Verify count in database
-    async with db_adapter.pool.acquire() as conn:
-        count_result = await conn.fetchval("SELECT COUNT(*) FROM patterns")
-        print(f"\nVerification: {count_result} embeddings in database")
+    # Verify count in database (database-specific)
+    try:
+        if db_type == "postgres":
+            async with db_adapter.pool.acquire() as conn:
+                count_result = await conn.fetchval("SELECT COUNT(*) FROM patterns")
+                print(f"\nVerification: {count_result} embeddings in database")
+        elif db_type == "qdrant":
+            collection_info = db_adapter.client.get_collection("patterns")
+            count_result = collection_info.points_count
+            print(f"\nVerification: {count_result} embeddings in database")
+        else:
+            print(f"\nVerification: Count check not implemented for {db_type}")
+    except Exception as e:
+        print(f"\nVerification failed: {e}")
 
     await db_adapter.disconnect()
 
