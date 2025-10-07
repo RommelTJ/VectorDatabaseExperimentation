@@ -261,7 +261,7 @@ docker-compose exec backend python scripts/memory_monitor.py
 
 #### Performance Evaluation
 
-**Full evaluation results**: TBD - QDRANT_EVALUATION.md
+**Full evaluation results**: [QDRANT_EVALUATION.md](./QDRANT_EVALUATION.md)
 
 **Quick Summary**:
 - **Ingestion**: 22,954 embeddings/sec (16.6x faster than Postgres!)
@@ -271,4 +271,6 @@ docker-compose exec backend python scripts/memory_monitor.py
 - **Storage**: 360MB for 423K vectors (1.66x overhead, 4.4x smaller than Postgres!)
 
 **Ratings**:
-- TBD
+- Practicality: ⭐⭐⭐⭐⭐ (5/5) - Perfect for vector-first workloads
+- Learnings: ⭐⭐⭐⭐⭐ (5/5) - Purpose-built performance is real
+- Fun: ⭐⭐⭐⭐⭐ (5/5) - Zero-config magic
