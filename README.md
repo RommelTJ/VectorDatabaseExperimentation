@@ -145,6 +145,16 @@ curl -X DELETE "http://localhost:8000/api/db/delete-pdf/10.1.21_Knot%20Your%20Ma
 docker exec -it vectordatabaseexperimentation-postgres-1 psql -U vectordb -d knitting_patterns -c "SELECT pdf_id, COUNT(*) FROM patterns GROUP BY pdf_id;"
 ```
 
+#### Storage Usage
+
+```bash
+# Check Postgres volume size
+docker-compose exec postgres du -sh /var/lib/postgresql/data
+
+# Compare to embeddings cache baseline
+du -sh ./data/embeddings
+```
+
 #### Performance Evaluation
 
 **Full evaluation results**: [POSTGRES_EVALUATION.md](./POSTGRES_EVALUATION.md)
