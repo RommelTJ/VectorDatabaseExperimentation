@@ -29,7 +29,41 @@ class RedisAdapter(VectorDatabase):
             raise HTTPException(status_code=500, detail=f"Failed to connect to Redis: {str(e)}")
 
     async def create_collection(self, collection_name: str, dimension: int) -> None:
-        raise HTTPException(status_code=501, detail=f"{self.name}: create_collection not implemented")
+        """Create a Redis index for vector search"""
+        if not self.client:
+            raise HTTPException(status_code=500, detail="Not connected to Redis")
+
+        try:
+            index_name = f"{collection_name}_idx"
+
+            # Drop existing index if it exists (ignore errors if not found)
+            try:
+                await self.client.execute_command("FT.DROPINDEX", index_name, "DD")
+                print(f"Dropped existing index: {index_name}")
+            except redis.ResponseError:
+                pass  # Index doesn't exist, which is fine
+
+            # Create index with vector field and metadata fields
+            # Using HNSW algorithm for vector similarity search
+            await self.client.execute_command(
+                "FT.CREATE", index_name,
+                "ON", "HASH",
+                "PREFIX", "1", f"{collection_name}:",
+                "SCHEMA",
+                "vector", "VECTOR", "HNSW", "6",
+                    "TYPE", "FLOAT32",
+                    "DIM", str(dimension),
+                    "DISTANCE_METRIC", "COSINE",
+                "pdf_id", "TAG",
+                "page_num", "NUMERIC",
+                "patch_index", "NUMERIC",
+                "title", "TEXT"
+            )
+
+            print(f"Created Redis index: {index_name} with dimension {dimension}")
+
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=f"Failed to create collection: {str(e)}")
 
     async def insert(
         self,
