@@ -1,5 +1,6 @@
 from typing import List, Dict, Any, Optional
 import os
+import struct
 from fastapi import HTTPException
 import redis.asyncio as redis
 from .base import VectorDatabase
@@ -72,7 +73,45 @@ class RedisAdapter(VectorDatabase):
         metadata: List[Dict[str, Any]],
         ids: Optional[List[str]] = None
     ) -> None:
-        raise HTTPException(status_code=501, detail=f"{self.name}: insert not implemented")
+        """Insert vectors and metadata into Redis"""
+        if not self.client:
+            raise HTTPException(status_code=500, detail="Not connected to Redis")
+
+        if len(vectors) != len(metadata):
+            raise HTTPException(status_code=400, detail="Vectors and metadata length mismatch")
+
+        try:
+            # Use pipeline for batch operations
+            pipe = self.client.pipeline()
+
+            for i, (vector, meta) in enumerate(zip(vectors, metadata)):
+                # Create unique key for this vector
+                pdf_id = meta.get('pdf_id', 'unknown')
+                page_num = meta.get('page_num', 0)
+                patch_index = meta.get('patch_index', i)
+
+                key = f"{collection_name}:{pdf_id}:{page_num}:{patch_index}"
+
+                # Convert vector to binary FLOAT32 format
+                vector_bytes = struct.pack(f'{len(vector)}f', *vector)
+
+                # Store hash with vector and metadata
+                pipe.hset(
+                    key,
+                    mapping={
+                        'vector': vector_bytes,
+                        'pdf_id': str(pdf_id),
+                        'page_num': str(page_num),
+                        'patch_index': str(patch_index),
+                        'title': meta.get('title', '')
+                    }
+                )
+
+            # Execute all commands in batch
+            await pipe.execute()
+
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=f"Failed to insert vectors: {str(e)}")
 
     async def search(
         self,
