@@ -120,7 +120,7 @@ class RedisAdapter(VectorDatabase):
         top_k: int = 10,
         filter: Optional[Dict[str, Any]] = None
     ) -> List[Dict[str, Any]]:
-        """Search for similar vectors using Redis vector search"""
+        """Search for similar vectors using Redis vector search with deduplication"""
         if not self.client:
             raise HTTPException(status_code=500, detail="Not connected to Redis")
 
@@ -130,20 +130,20 @@ class RedisAdapter(VectorDatabase):
             # Convert query vector to binary format
             query_bytes = struct.pack(f'{len(query_vector)}f', *query_vector)
 
+            # Fetch 3x the requested amount to ensure enough unique PDFs after deduplication
             # Build the KNN query
-            # FT.SEARCH index "*=>[KNN k @vector_field $query_blob]" PARAMS 2 query_blob <blob> RETURN 5 pdf_id page_num patch_index title __vector_score SORTBY __vector_score DIALECT 2
             result = await self.client.execute_command(
                 "FT.SEARCH", index_name,
-                f"*=>[KNN {top_k} @vector $query_blob]",
+                f"*=>[KNN {top_k * 3} @vector $query_blob]",
                 "PARAMS", "2", "query_blob", query_bytes,
                 "RETURN", "5", "pdf_id", "page_num", "patch_index", "title", "__vector_score",
                 "SORTBY", "__vector_score",
                 "DIALECT", "2"
             )
 
-            # Parse results
+            # Parse results and deduplicate by pdf_id
             # Result format: [total_count, key1, [field1, value1, field2, value2, ...], key2, [...], ...]
-            results = []
+            seen_pdfs = {}
             if result[0] > 0:  # Check if we have results
                 # Skip the count (index 0), iterate through key-value pairs
                 for i in range(1, len(result), 2):
@@ -157,17 +157,20 @@ class RedisAdapter(VectorDatabase):
                         field_value = fields[j + 1].decode('utf-8') if isinstance(fields[j + 1], bytes) else fields[j + 1]
                         field_dict[field_name] = field_value
 
-                    # Format result
-                    results.append({
-                        'id': key,
-                        'score': 1.0 - float(field_dict.get('__vector_score', '1.0')),  # Convert distance to similarity
-                        'metadata': {
-                            'pdf_id': field_dict.get('pdf_id', ''),
+                    pdf_id = field_dict.get('pdf_id', '')
+
+                    # Keep only the first (highest scoring) result for each pdf_id
+                    if pdf_id not in seen_pdfs:
+                        seen_pdfs[pdf_id] = {
+                            'pdf_id': pdf_id,
                             'page_num': int(field_dict.get('page_num', 0)),
                             'patch_index': int(field_dict.get('patch_index', 0)),
-                            'title': field_dict.get('title', '')
+                            'title': field_dict.get('title', ''),
+                            'score': 1.0 - float(field_dict.get('__vector_score', '1.0'))  # Convert distance to similarity
                         }
-                    })
+
+            # Convert to list and take top_k
+            results = list(seen_pdfs.values())[:top_k]
 
             return results
 
