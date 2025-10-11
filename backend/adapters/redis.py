@@ -179,7 +179,36 @@ class RedisAdapter(VectorDatabase):
         collection_name: str,
         ids: List[str]
     ) -> None:
-        raise HTTPException(status_code=501, detail=f"{self.name}: delete not implemented")
+        """Delete vectors by pdf_id"""
+        if not self.client:
+            raise HTTPException(status_code=500, detail="Not connected to Redis")
+
+        try:
+            total_deleted = 0
+
+            for pdf_id in ids:
+                # Pattern to match all keys for this PDF
+                pattern = f"{collection_name}:{pdf_id}:*"
+
+                # Find all matching keys using SCAN
+                keys_to_delete = []
+                cursor = 0
+                while True:
+                    cursor, keys = await self.client.scan(cursor, match=pattern, count=1000)
+                    keys_to_delete.extend(keys)
+                    if cursor == 0:
+                        break
+
+                # Delete all matching keys
+                if keys_to_delete:
+                    deleted = await self.client.delete(*keys_to_delete)
+                    total_deleted += deleted
+                    print(f"Deleted {deleted} keys for pdf_id: {pdf_id}")
+
+            print(f"Total deleted: {total_deleted} keys")
+
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=f"Failed to delete: {str(e)}")
 
     async def disconnect(self) -> None:
         """Close Redis connection"""
