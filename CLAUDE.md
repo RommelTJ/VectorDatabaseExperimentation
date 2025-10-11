@@ -176,8 +176,9 @@ The generic interface should support:
 - Implement `search()` for text queries
 - Support configurable k (top-k results)
 - Use cosine similarity as default metric
-- Return results with scores and metadata
-- **Verification**: Test with known queries, verify result ordering
+- **IMPORTANT**: Implement deduplication by pdf_id (fetch 3x results, keep best patch per PDF)
+- Return results with scores and metadata at top level (not nested in metadata field)
+- **Verification**: Test with known queries, verify result ordering and no duplicate PDFs
 
 ##### Step 6: Delete Implementation ✅
 - Implement `delete()` method
