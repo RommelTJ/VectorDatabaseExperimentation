@@ -15,8 +15,10 @@ Single line in docker-compose.yml. Redis Stack Docker image includes RediSearch 
 **Index Definition**: ⭐⭐⭐ (3/5)
 RediSearch FT.CREATE syntax is more verbose than expected. HNSW parameters require understanding Redis-specific conventions. Binary vector encoding (struct.pack) adds complexity vs other databases.
 
+**Note**: In production, you'd wrap this in a library/abstraction layer once and reuse it. The low-level complexity reflects our experimental approach (direct implementation) rather than a fundamental issue with Redis.
+
 **Client Library**: ⭐⭐⭐⭐ (4/5)
-Used `redis-py` (async) - mature and well-documented. Direct command execution with execute_command() gives flexibility but feels lower-level than purpose-built vector DB clients.
+Used `redis-py` (async) - mature and well-documented. Direct command execution with execute_command() gives flexibility but feels lower-level than purpose-built vector DB clients. In a real caching layer, you'd encapsulate the binary encoding and parsing once.
 
 ---
 
