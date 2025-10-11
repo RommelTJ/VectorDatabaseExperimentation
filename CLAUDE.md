@@ -153,7 +153,10 @@ The generic interface should support:
 - Implement `connect()` method in database adapter
 - Handle connection pooling if applicable
 - Add proper error handling for connection failures
-- **Verification**: Test connection with simple ping/health check
+- **Verification**: Test connection using `/api/db/test-connection` endpoint
+  - `curl http://localhost:8000/api/db/test-connection`
+  - Check logs: `docker compose logs backend | grep -i <dbname>`
+  - Should see "Connected to <dbname>" and "Disconnected from <dbname>"
 
 ##### Step 3: Collection/Table Creation ✅
 - Implement `create_collection()` method
