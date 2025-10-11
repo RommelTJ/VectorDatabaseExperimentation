@@ -127,6 +127,119 @@ Actual Redis vector search is estimated **<100ms**, similar to Postgres.
 
 ---
 
+## When Redis Vector Search Actually Makes Sense
+
+**Key Insight**: Redis vectors are not a standalone solution - they're a **tactical caching layer** in a hybrid architecture.
+
+### Architecture Pattern: Hot Cache Layer
+
+```
+┌─────────────────────────────────────────────┐
+│ Primary Vector DB (Postgres/Qdrant/Pinecone)│
+│ • 10M product embeddings (cold storage)     │
+│ • Complete dataset on disk                  │
+│ • Occasional writes                         │
+└──────────────────┬──────────────────────────┘
+                   │
+                   ↓ Sync trending items (1 hour TTL)
+┌─────────────────────────────────────────────┐
+│ Redis Cache Layer                           │
+│ • 50K hot embeddings (in RAM)               │
+│ • Auto-eviction via TTL/LRU                 │
+│ • Sub-10ms vector search                    │
+└──────────────────┬──────────────────────────┘
+                   │
+                   ↓ User queries hit cache first
+┌─────────────────────────────────────────────┐
+│ Application Layer                           │
+│ • Check Redis first (fast path)            │
+│ • Fallback to primary DB if cache miss     │
+│ • Async backfill Redis for next query      │
+└─────────────────────────────────────────────┘
+```
+
+### Real-World Scenarios
+
+**1. E-Commerce "People Also Viewed"**
+
+Black Friday traffic spike:
+- **Primary DB**: 5M products in Postgres
+- **Redis hot cache**: 20K currently-browsed items
+- **Flow**: As users view products, embeddings loaded to Redis
+- **Benefit**: "Similar items" queries hit Redis (sub-10ms), not primary DB
+- **Eviction**: LRU evicts stale products after 1 hour
+- **Result**: 80% cache hit rate, 10x lower latency for hot items
+
+**2. Real-Time Session Personalization**
+
+```python
+# User session stored in Redis
+session:user123 = {
+    "cart": [...],
+    "recent_views": [product_ids],
+    "view_embeddings": [128d vectors],  # Last 20 items
+    "preferences": {...}
+}
+
+# Find similar users by session similarity (Redis-only)
+similar_users = redis.ft_search("sessions", user_embedding, k=5)
+
+# Redis pub/sub notifies when similar users buy items
+redis.publish(f"recs:user123", similar_users[0].purchases)
+```
+
+Everything in one system:
+- Session state (traditional Redis use)
+- Vector similarity search (find similar users/items)
+- Real-time events (pub/sub for live recommendations)
+- All with single-digit millisecond latency
+
+**3. LLM Embedding Cache**
+
+```python
+# Generate embeddings once, cache in Redis
+query_embedding = get_or_create_embedding(query_text)
+
+def get_or_create_embedding(text):
+    # Check Redis first (cached embedding)
+    cached = redis.get(f"embedding:{hash(text)}")
+    if cached:
+        return pickle.loads(cached)
+
+    # Cache miss - generate and store (1 hour TTL)
+    embedding = llm_model.embed(text)
+    redis.setex(f"embedding:{hash(text)}", 3600, pickle.dumps(embedding))
+    return embedding
+```
+
+**Benefit**: Save expensive LLM API calls. Popular queries hit cache (free + instant).
+
+### Why This Works
+
+1. **Bounded memory**: Only hot items in Redis (e.g., 50K vectors = 24MB RAM)
+2. **Primary DB handles scale**: Millions of vectors stay in cheap disk storage
+3. **Best of both worlds**: Redis speed + Primary DB reliability
+4. **Operational simplicity**: Already using Redis? Add vectors to existing infrastructure
+5. **Cost effective**: Pay for RAM only for hot data, disk for cold data
+
+### When NOT to Use Redis Alone
+
+❌ **Primary vector database** (no fallback) → Use Postgres/Qdrant/Pinecone
+❌ **>1M vectors** (all in RAM) → Too expensive, use disk-backed DB
+❌ **High concurrent reads** (>5 users) → Redis fails under load (45% failures at 10 users)
+❌ **Durable storage required** → Redis is ephemeral, use persistent DB
+❌ **Complex filtering** → Redis lacks rich query capabilities
+
+### Bottom Line
+
+Redis vectors are a **performance optimization**, not a database choice. Think:
+- "I have Postgres + Redis, let me add hot-path vector caching to Redis"
+- NOT "I need vector search, let me use Redis"
+
+The sweet spot: **10K-100K hot vectors** with **TTL/LRU eviction** on top of a **persistent primary vector DB**.
+
+---
+
 ## Developer Experience
 
 ### Setup Time
