@@ -17,6 +17,8 @@ services:
       - QDRANT_PORT=6333
       - REDIS_HOST=redis
       - REDIS_PORT=6379
+      - ELASTICSEARCH_HOST=elasticsearch
+      - ELASTICSEARCH_PORT=9200
     volumes:
       - huggingface-cache:/root/.cache/huggingface
       - ./data:/app/data  # Mount data directory (PDFs and embeddings)
@@ -86,6 +88,26 @@ services:
       timeout: 5s
       retries: 5
 
+  elasticsearch:
+    profiles: ["elasticsearch"]
+    image: elasticsearch:8.11.0
+    ports:
+      - "9200:9200"
+      - "9300:9300"
+    environment:
+      - discovery.type=single-node
+      - xpack.security.enabled=false
+      - "ES_JAVA_OPTS=-Xms512m -Xmx2g"
+    volumes:
+      - elasticsearch-data:/usr/share/elasticsearch/data
+    networks:
+      - app-network
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:9200/_cluster/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
 networks:
   app-network:
     driver: bridge
@@ -95,3 +117,4 @@ volumes:
   postgres-data:
   qdrant-data:
   redis-data:
+  elasticsearch-data:
