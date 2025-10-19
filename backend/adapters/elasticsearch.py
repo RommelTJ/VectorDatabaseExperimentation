@@ -28,7 +28,52 @@ class ElasticsearchAdapter(VectorDatabase):
             raise HTTPException(status_code=500, detail=f"Failed to connect to Elasticsearch: {str(e)}")
 
     async def create_collection(self, collection_name: str, dimension: int) -> None:
-        raise HTTPException(status_code=501, detail=f"{self.name}: create_collection not implemented")
+        """Create an Elasticsearch index for vector search"""
+        if not self.client:
+            raise HTTPException(status_code=500, detail="Not connected to Elasticsearch")
+
+        try:
+            # Delete existing index if it exists
+            if await self.client.indices.exists(index=collection_name):
+                await self.client.indices.delete(index=collection_name)
+                print(f"Deleted existing index: {collection_name}")
+
+            # Create index with vector field and metadata fields
+            # Using dense_vector field type with cosine similarity
+            index_body = {
+                "mappings": {
+                    "properties": {
+                        "vector": {
+                            "type": "dense_vector",
+                            "dims": dimension,
+                            "index": True,
+                            "similarity": "cosine"
+                        },
+                        "pdf_id": {
+                            "type": "keyword"
+                        },
+                        "page_num": {
+                            "type": "integer"
+                        },
+                        "patch_index": {
+                            "type": "integer"
+                        },
+                        "title": {
+                            "type": "text"
+                        }
+                    }
+                },
+                "settings": {
+                    "number_of_shards": 1,
+                    "number_of_replicas": 0  # No replicas for local testing
+                }
+            }
+
+            await self.client.indices.create(index=collection_name, body=index_body)
+            print(f"Created Elasticsearch index: {collection_name} with dimension {dimension}")
+
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=f"Failed to create collection: {str(e)}")
 
     async def insert(
         self,
