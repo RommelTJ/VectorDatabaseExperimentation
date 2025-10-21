@@ -136,7 +136,56 @@ class ElasticsearchAdapter(VectorDatabase):
         top_k: int = 10,
         filter: Optional[Dict[str, Any]] = None
     ) -> List[Dict[str, Any]]:
-        raise HTTPException(status_code=501, detail=f"{self.name}: search not implemented")
+        """Search for similar vectors using Elasticsearch kNN search with deduplication"""
+        if not self.client:
+            raise HTTPException(status_code=500, detail="Not connected to Elasticsearch")
+
+        try:
+            # Fetch 3x the requested amount to ensure enough unique PDFs after deduplication
+            fetch_size = top_k * 3
+
+            # Build kNN search query
+            search_body = {
+                "knn": {
+                    "field": "vector",
+                    "query_vector": query_vector,
+                    "k": fetch_size,
+                    "num_candidates": fetch_size * 2  # Number of candidates to consider
+                },
+                "_source": ["pdf_id", "page_num", "patch_index", "title"],
+                "size": fetch_size
+            }
+
+            # Execute search
+            response = await self.client.search(
+                index=collection_name,
+                body=search_body
+            )
+
+            # Parse results and deduplicate by pdf_id
+            seen_pdfs = {}
+            for hit in response['hits']['hits']:
+                source = hit['_source']
+                pdf_id = source['pdf_id']
+                score = hit['_score']
+
+                # Keep only the first (highest scoring) result for each pdf_id
+                if pdf_id not in seen_pdfs:
+                    seen_pdfs[pdf_id] = {
+                        'pdf_id': pdf_id,
+                        'page_num': source['page_num'],
+                        'patch_index': source['patch_index'],
+                        'title': source['title'],
+                        'score': score
+                    }
+
+            # Convert to list and take top_k
+            results = list(seen_pdfs.values())[:top_k]
+
+            return results
+
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=f"Failed to search: {str(e)}")
 
     async def delete(
         self,
