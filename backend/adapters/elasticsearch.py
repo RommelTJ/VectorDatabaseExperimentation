@@ -2,6 +2,7 @@ from typing import List, Dict, Any, Optional
 import os
 from fastapi import HTTPException
 from elasticsearch import AsyncElasticsearch
+from elasticsearch.helpers import async_bulk
 from .base import VectorDatabase
 
 
@@ -82,7 +83,51 @@ class ElasticsearchAdapter(VectorDatabase):
         metadata: List[Dict[str, Any]],
         ids: Optional[List[str]] = None
     ) -> None:
-        raise HTTPException(status_code=501, detail=f"{self.name}: insert not implemented")
+        """Insert vectors and metadata into Elasticsearch using bulk API"""
+        if not self.client:
+            raise HTTPException(status_code=500, detail="Not connected to Elasticsearch")
+
+        if len(vectors) != len(metadata):
+            raise HTTPException(status_code=400, detail="Vectors and metadata length mismatch")
+
+        try:
+            # Prepare bulk actions
+            actions = []
+            for i, (vector, meta) in enumerate(zip(vectors, metadata)):
+                # Create unique document ID
+                pdf_id = meta.get('pdf_id', 'unknown')
+                page_num = meta.get('page_num', 0)
+                patch_index = meta.get('patch_index', i)
+
+                doc_id = f"{pdf_id}_{page_num}_{patch_index}"
+
+                # Create document with vector and metadata
+                action = {
+                    "_index": collection_name,
+                    "_id": doc_id,
+                    "_source": {
+                        "vector": vector,
+                        "pdf_id": str(pdf_id),
+                        "page_num": page_num,
+                        "patch_index": patch_index,
+                        "title": meta.get('title', '')
+                    }
+                }
+                actions.append(action)
+
+            # Execute bulk insert
+            success, failed = await async_bulk(
+                self.client,
+                actions,
+                chunk_size=500,
+                raise_on_error=False
+            )
+
+            if failed:
+                print(f"Warning: {len(failed)} documents failed to insert")
+
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=f"Failed to insert vectors: {str(e)}")
 
     async def search(
         self,
