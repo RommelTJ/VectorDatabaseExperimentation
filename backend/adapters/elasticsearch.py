@@ -192,7 +192,37 @@ class ElasticsearchAdapter(VectorDatabase):
         collection_name: str,
         ids: List[str]
     ) -> None:
-        raise HTTPException(status_code=501, detail=f"{self.name}: delete not implemented")
+        """Delete vectors by pdf_id using delete_by_query"""
+        if not self.client:
+            raise HTTPException(status_code=500, detail="Not connected to Elasticsearch")
+
+        try:
+            total_deleted = 0
+
+            for pdf_id in ids:
+                # Delete all documents matching this pdf_id
+                delete_body = {
+                    "query": {
+                        "term": {
+                            "pdf_id": pdf_id
+                        }
+                    }
+                }
+
+                result = await self.client.delete_by_query(
+                    index=collection_name,
+                    body=delete_body,
+                    refresh=True  # Make changes immediately visible
+                )
+
+                deleted = result.get('deleted', 0)
+                total_deleted += deleted
+                print(f"Deleted {deleted} documents for pdf_id: {pdf_id}")
+
+            print(f"Total deleted: {total_deleted} documents")
+
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=f"Failed to delete: {str(e)}")
 
     async def disconnect(self) -> None:
         """Close Elasticsearch connection"""
