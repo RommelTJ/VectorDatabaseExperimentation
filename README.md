@@ -366,3 +366,92 @@ du -sh ./data/embeddings
 - Fun: ⭐⭐⭐ (3/5) - Fast ingestion, frustrating failures
 
 **Key Insight**: Redis vectors are best used as a **tactical caching layer** on top of a primary vector DB (Postgres/Qdrant), not as a standalone solution. Perfect for caching 10K-100K hot vectors with TTL/LRU eviction.
+
+### Elasticsearch
+
+#### Setup and Basic Operations
+
+```bash
+# Start the Elasticsearch service
+VECTOR_DB_TYPE=elasticsearch docker compose --profile elasticsearch up -d
+
+# Check logs
+docker compose logs elasticsearch
+
+# Test database connection
+curl http://localhost:8000/api/db/test-connection
+
+# Create the vector index
+curl -X POST http://localhost:8000/api/db/create-collection
+
+# Verify index exists (via Elasticsearch API)
+curl http://localhost:9200/patterns
+```
+
+#### Data Ingestion
+
+```bash
+# Insert a few test PDFs from cache
+curl -X POST "http://localhost:8000/api/db/test-insert?num_pdfs=2"
+
+# Check inserted data
+curl http://localhost:9200/patterns/_count
+
+# Full ingestion of all 80 training PDFs
+docker compose exec backend python ingest_all_training.py
+
+# Verify total count (should be 423,741 embeddings)
+curl http://localhost:9200/patterns/_count
+```
+
+#### Search Operations
+
+```bash
+# Text search
+curl -X POST http://localhost:8000/api/search/text \
+  -H "Content-Type: application/json" \
+  -d '{"query": "cable knit pattern", "limit": 5}'
+
+# Search for scarf patterns
+curl -X POST http://localhost:8000/api/search/text \
+  -H "Content-Type: application/json" \
+  -d '{"query": "scarf", "limit": 5}'
+```
+
+#### Delete Operations
+
+```bash
+# Delete a specific PDF (URL-encode spaces as %20)
+curl -X DELETE "http://localhost:8000/api/db/delete-pdf/10.1.21_Knot%20Your%20Mamas%20Headband"
+
+# Verify deletion (via count)
+curl http://localhost:9200/patterns/_count
+```
+
+#### Storage Usage
+
+```bash
+# Check Elasticsearch volume size
+docker compose exec elasticsearch du -sh /usr/share/elasticsearch/data
+
+# Compare to embeddings cache baseline
+du -sh ./data/embeddings
+```
+
+#### Performance Evaluation
+
+**Full evaluation results**: [ELASTICSEARCH_EVALUATION.md](./ELASTICSEARCH_EVALUATION.md)
+
+**Quick Summary**:
+- **Ingestion**: 5,117 embeddings/sec (3.7x faster than Postgres)
+- **Query latency**: p50=1,150ms (mostly ColPali embedding generation, <50ms for actual DB search)
+- **Concurrency**: 100% success rate at 10 users (perfect reliability!)
+- **Memory**: 13.6GB peak (dominated by ColPali model)
+- **Storage**: 1.1GB for 423K vectors (5.3x overhead)
+
+**Ratings**:
+- Practicality: ⭐⭐⭐⭐ (4/5) - Excellent for hybrid search (vectors + text)
+- Learnings: ⭐⭐⭐⭐ (4/5) - Hybrid search capabilities are powerful
+- Fun: ⭐⭐⭐⭐ (4/5) - Rock-solid reliability, clean API
+
+**Key Insight**: Elasticsearch excels at **hybrid search** (combining vector similarity with full-text search, filters, and aggregations). Perfect for applications needing both semantic and keyword search in one query.
