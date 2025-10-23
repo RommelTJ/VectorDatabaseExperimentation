@@ -1,14 +1,30 @@
 from typing import List, Dict, Any, Optional
+import os
 from fastapi import HTTPException
+from pymilvus import MilvusClient, connections
 from .base import VectorDatabase
 
 
 class MilvusAdapter(VectorDatabase):
     def __init__(self):
         self.name = "Milvus"
+        self.client: Optional[MilvusClient] = None
+        self.host = os.getenv("MILVUS_HOST", "localhost")
+        self.port = int(os.getenv("MILVUS_PORT", "19530"))
+        self.alias = "default"
 
     async def connect(self) -> None:
-        raise HTTPException(status_code=501, detail=f"{self.name}: connect not implemented")
+        """Connect to Milvus and verify connection"""
+        try:
+            # Create MilvusClient for simpler API
+            uri = f"http://{self.host}:{self.port}"
+            self.client = MilvusClient(uri=uri)
+
+            # Verify connection by listing collections
+            collections = self.client.list_collections()
+            print(f"Connected to Milvus at {self.host}:{self.port} (collections: {len(collections)})")
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=f"Failed to connect to Milvus: {str(e)}")
 
     async def create_collection(self, collection_name: str, dimension: int) -> None:
         raise HTTPException(status_code=501, detail=f"{self.name}: create_collection not implemented")
@@ -39,4 +55,11 @@ class MilvusAdapter(VectorDatabase):
         raise HTTPException(status_code=501, detail=f"{self.name}: delete not implemented")
 
     async def disconnect(self) -> None:
-        raise HTTPException(status_code=501, detail=f"{self.name}: disconnect not implemented")
+        """Disconnect from Milvus"""
+        try:
+            if self.client:
+                self.client.close()
+                self.client = None
+                print(f"Disconnected from Milvus")
+        except Exception as e:
+            print(f"Error disconnecting from Milvus: {str(e)}")
