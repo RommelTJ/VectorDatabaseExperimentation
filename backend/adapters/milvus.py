@@ -121,7 +121,53 @@ class MilvusAdapter(VectorDatabase):
         top_k: int = 10,
         filter: Optional[Dict[str, Any]] = None
     ) -> List[Dict[str, Any]]:
-        raise HTTPException(status_code=501, detail=f"{self.name}: search not implemented")
+        """Search for similar vectors using Milvus vector search with deduplication"""
+        if not self.client:
+            raise HTTPException(status_code=500, detail="Not connected to Milvus")
+
+        try:
+            # Fetch 3x the requested amount to ensure enough unique PDFs after deduplication
+            fetch_size = top_k * 3
+
+            # Execute vector search
+            # MilvusClient.search returns results with distance scores
+            results = self.client.search(
+                collection_name=collection_name,
+                data=[query_vector],  # Must be a list of vectors
+                limit=fetch_size,
+                output_fields=["pdf_id", "page_num", "patch_index", "title"]
+            )
+
+            # Parse results and deduplicate by pdf_id
+            # Results is a list of lists (one list per query vector)
+            seen_pdfs = {}
+            if results and len(results) > 0:
+                for hit in results[0]:  # Get first query's results
+                    pdf_id = hit.get('entity', {}).get('pdf_id') or hit.get('pdf_id')
+
+                    # Milvus returns distance (lower is better for COSINE)
+                    # Convert to similarity score (higher is better)
+                    distance = hit.get('distance', 0.0)
+                    score = 1.0 - distance  # For cosine, distance is 1 - similarity
+
+                    # Keep only the first (highest scoring) result for each pdf_id
+                    if pdf_id and pdf_id not in seen_pdfs:
+                        entity = hit.get('entity', {})
+                        seen_pdfs[pdf_id] = {
+                            'pdf_id': pdf_id,
+                            'page_num': entity.get('page_num', hit.get('page_num', 0)),
+                            'patch_index': entity.get('patch_index', hit.get('patch_index', 0)),
+                            'title': entity.get('title', hit.get('title', '')),
+                            'score': score
+                        }
+
+            # Convert to list and take top_k
+            final_results = list(seen_pdfs.values())[:top_k]
+
+            return final_results
+
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=f"Failed to search: {str(e)}")
 
     async def delete(
         self,
