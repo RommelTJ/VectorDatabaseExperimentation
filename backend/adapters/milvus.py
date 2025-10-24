@@ -27,7 +27,33 @@ class MilvusAdapter(VectorDatabase):
             raise HTTPException(status_code=500, detail=f"Failed to connect to Milvus: {str(e)}")
 
     async def create_collection(self, collection_name: str, dimension: int) -> None:
-        raise HTTPException(status_code=501, detail=f"{self.name}: create_collection not implemented")
+        """Create a Milvus collection for vector search"""
+        if not self.client:
+            raise HTTPException(status_code=500, detail="Not connected to Milvus")
+
+        try:
+            # Drop existing collection if it exists
+            if self.client.has_collection(collection_name):
+                self.client.drop_collection(collection_name)
+                print(f"Dropped existing collection: {collection_name}")
+
+            # Create collection with MilvusClient's simple API
+            # This automatically creates id (primary key), vector, and any other fields
+            self.client.create_collection(
+                collection_name=collection_name,
+                dimension=dimension,
+                metric_type="COSINE",  # Use cosine similarity
+                index_type="HNSW",     # HNSW index for fast ANN search
+                params={
+                    "M": 16,           # Number of connections per layer
+                    "efConstruction": 200  # Size of dynamic candidate list for construction
+                }
+            )
+
+            print(f"Created Milvus collection: {collection_name} with dimension {dimension}")
+
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=f"Failed to create collection: {str(e)}")
 
     async def insert(
         self,
