@@ -174,7 +174,25 @@ class MilvusAdapter(VectorDatabase):
         collection_name: str,
         ids: List[str]
     ) -> None:
-        raise HTTPException(status_code=501, detail=f"{self.name}: delete not implemented")
+        """Delete vectors by pdf_id using expression-based deletion"""
+        if not self.client:
+            raise HTTPException(status_code=500, detail="Not connected to Milvus")
+
+        try:
+            for pdf_id in ids:
+                # Delete all entities matching this pdf_id using filter expression
+                # Milvus uses filter expressions like: pdf_id == "value"
+                filter_expr = f'pdf_id == "{pdf_id}"'
+
+                self.client.delete(
+                    collection_name=collection_name,
+                    filter=filter_expr
+                )
+
+                print(f"Deleted entities for pdf_id: {pdf_id}")
+
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=f"Failed to delete: {str(e)}")
 
     async def disconnect(self) -> None:
         """Disconnect from Milvus"""
