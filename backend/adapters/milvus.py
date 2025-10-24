@@ -1,5 +1,6 @@
 from typing import List, Dict, Any, Optional
 import os
+import hashlib
 from fastapi import HTTPException
 from pymilvus import MilvusClient, connections
 from .base import VectorDatabase
@@ -62,7 +63,56 @@ class MilvusAdapter(VectorDatabase):
         metadata: List[Dict[str, Any]],
         ids: Optional[List[str]] = None
     ) -> None:
-        raise HTTPException(status_code=501, detail=f"{self.name}: insert not implemented")
+        """Insert vectors and metadata into Milvus using batch insert"""
+        if not self.client:
+            raise HTTPException(status_code=500, detail="Not connected to Milvus")
+
+        if len(vectors) != len(metadata):
+            raise HTTPException(status_code=400, detail="Vectors and metadata length mismatch")
+
+        try:
+            # Prepare data for insertion
+            # MilvusClient expects a list of dictionaries
+            # Note: The 'id' field must be an int64 (auto_id is False in the schema)
+            # We hash the compound key to get a deterministic integer ID
+            data = []
+            for i, (vector, meta) in enumerate(zip(vectors, metadata)):
+                pdf_id = meta.get('pdf_id', 'unknown')
+                page_num = meta.get('page_num', 0)
+                patch_index = meta.get('patch_index', i)
+
+                # Create deterministic integer ID by hashing the compound key
+                # This ensures same PDF/page/patch always gets same ID (upsert behavior)
+                compound_key = f"{pdf_id}_{page_num}_{patch_index}"
+                hash_int = int(hashlib.md5(compound_key.encode()).hexdigest()[:16], 16)
+                # Convert to signed int64 range
+                int64_id = hash_int % (2**63)
+
+                # Create document with integer id, vector, and metadata
+                # Dynamic fields (pdf_id, page_num, etc.) are supported
+                doc = {
+                    "id": int64_id,
+                    "vector": vector,
+                    "pdf_id": str(pdf_id),
+                    "page_num": page_num,
+                    "patch_index": patch_index,
+                    "title": meta.get('title', '')
+                }
+                data.append(doc)
+
+            # Insert data in batches of 500
+            batch_size = 500
+            for i in range(0, len(data), batch_size):
+                batch = data[i:i + batch_size]
+                self.client.insert(
+                    collection_name=collection_name,
+                    data=batch
+                )
+
+            print(f"Inserted {len(data)} vectors into {collection_name}")
+
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=f"Failed to insert vectors: {str(e)}")
 
     async def search(
         self,
