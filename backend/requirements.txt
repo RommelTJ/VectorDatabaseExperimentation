@@ -11,6 +11,11 @@ pgvector==0.3.0
 qdrant-client==1.12.0
 redis==5.0.1
 elasticsearch==8.11.0
+pymilvus==2.4.9
+marshmallow>=3.13.0,<4.0.0
+environs>=9.5.0
+protobuf>=3.20.0
+grpcio>=1.49.1
 aiohttp==3.9.1
 httpx==0.27.0
 psutil==6.1.0

@@ -2,7 +2,7 @@
 
 Experimenting with embeddings and vector databases
 
-Version: 0.10.0 - 21 Oct 2025
+Version: 0.11.0 - 25 Oct 2025
 
 ## Quick Start
 
@@ -455,3 +455,95 @@ du -sh ./data/embeddings
 - Fun: ⭐⭐⭐⭐ (4/5) - Rock-solid reliability, clean API
 
 **Key Insight**: Elasticsearch excels at **hybrid search** (combining vector similarity with full-text search, filters, and aggregations). Perfect for applications needing both semantic and keyword search in one query.
+
+### Milvus
+
+#### Setup and Basic Operations
+
+```bash
+# Start the Milvus service
+VECTOR_DB_TYPE=milvus docker compose --profile milvus up -d
+
+# Check logs (note: very verbose warnings in standalone mode)
+docker compose logs milvus
+
+# Test database connection
+curl http://localhost:8000/api/db/test-connection
+
+# Create the vector collection
+curl -X POST http://localhost:8000/api/db/create-collection
+
+# Verify collection (via backend logs)
+docker compose logs backend | grep -i milvus
+```
+
+#### Data Ingestion
+
+```bash
+# Insert a few test PDFs from cache
+curl -X POST "http://localhost:8000/api/db/test-insert?num_pdfs=2"
+
+# Full ingestion of all 80 training PDFs
+docker compose exec backend python ingest_all_training.py
+
+# Verify total count (stats may show 0 due to lag, but data is present)
+# Test with a search query instead
+curl -X POST http://localhost:8000/api/search/text \
+  -H "Content-Type: application/json" \
+  -d '{"query": "test", "limit": 5}'
+```
+
+#### Search Operations
+
+```bash
+# Text search (note: 15-second cold start on first query!)
+curl -X POST http://localhost:8000/api/search/text \
+  -H "Content-Type: application/json" \
+  -d '{"query": "cable knit pattern", "limit": 5}'
+
+# Subsequent searches are fast
+curl -X POST http://localhost:8000/api/search/text \
+  -H "Content-Type: application/json" \
+  -d '{"query": "scarf", "limit": 5}'
+```
+
+#### Delete Operations
+
+```bash
+# Delete a specific PDF (URL-encode spaces as %20)
+curl -X DELETE "http://localhost:8000/api/db/delete-pdf/10.1.21_Knot%20Your%20Mamas%20Headband"
+
+# Verify deletion (via search)
+curl -X POST http://localhost:8000/api/search/text \
+  -H "Content-Type: application/json" \
+  -d '{"query": "headband", "limit": 5}'
+```
+
+#### Storage Usage
+
+```bash
+# Check Milvus volume size
+docker compose exec milvus du -sh /var/lib/milvus
+
+# Compare to embeddings cache baseline
+du -sh ./data/embeddings
+```
+
+#### Performance Evaluation
+
+**Full evaluation results**: [MILVUS_EVALUATION.md](./MILVUS_EVALUATION.md)
+
+**Quick Summary**:
+- **Ingestion**: 32,496 embeddings/sec (FASTEST - 1.4x faster than Qdrant!)
+- **Query latency**: p50=700ms (excellent, mostly ColPali embedding generation)
+- **Concurrency**: ⚠️ 90% success rate at 10 users (10% failures - concerning)
+- **Memory**: 13.6GB peak (dominated by ColPali model)
+- **Cold start**: 15 seconds on first query (problematic for dev/test)
+- **Learning curve**: High (integer IDs, dependency conflicts, confusing APIs)
+
+**Ratings**:
+- Practicality: ⭐⭐⭐ (3/5) - Only for specific bulk ingestion use cases
+- Learnings: ⭐⭐⭐⭐ (4/5) - Raw speed ≠ production readiness
+- Fun: ⭐⭐ (2/5) - Least fun database (dependency hell, noisy logs, API quirks)
+
+**Key Insight**: Milvus is a **high-performance specialist** for bulk ingestion (32K emb/s is unmatched) but struggles with concurrency, has a steep learning curve, and rough developer experience. Use only if you need maximum write throughput and have expertise to handle its quirks. For general-purpose vector search, **Qdrant or Elasticsearch are safer choices**.
