@@ -21,6 +21,8 @@ services:
       - ELASTICSEARCH_PORT=9200
       - MILVUS_HOST=milvus
       - MILVUS_PORT=19530
+      - WEAVIATE_HOST=weaviate
+      - WEAVIATE_PORT=8080
     volumes:
       - huggingface-cache:/root/.cache/huggingface
       - ./data:/app/data  # Mount data directory (PDFs and embeddings)
@@ -130,6 +132,29 @@ services:
       timeout: 5s
       retries: 5
 
+  weaviate:
+    profiles: ["weaviate"]
+    image: semitechnologies/weaviate:1.27.5
+    ports:
+      - "8080:8080"
+      - "50051:50051"
+    environment:
+      - QUERY_DEFAULTS_LIMIT=25
+      - AUTHENTICATION_ANONYMOUS_ACCESS_ENABLED=true
+      - PERSISTENCE_DATA_PATH=/var/lib/weaviate
+      - DEFAULT_VECTORIZER_MODULE=none
+      - ENABLE_MODULES=
+      - CLUSTER_HOSTNAME=node1
+    volumes:
+      - weaviate-data:/var/lib/weaviate
+    networks:
+      - app-network
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8080/v1/.well-known/ready || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
 networks:
   app-network:
     driver: bridge
@@ -141,3 +166,4 @@ volumes:
   redis-data:
   elasticsearch-data:
   milvus-data:
+  weaviate-data:
