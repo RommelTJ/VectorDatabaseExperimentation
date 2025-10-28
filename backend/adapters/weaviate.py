@@ -3,6 +3,7 @@ import os
 import uuid
 import weaviate
 from weaviate.classes.config import Configure, Property, DataType, VectorDistances
+from weaviate.classes.query import MetadataQuery
 from weaviate.util import generate_uuid5
 from fastapi import HTTPException
 from .base import VectorDatabase
@@ -144,7 +145,51 @@ class WeaviateAdapter(VectorDatabase):
         top_k: int = 10,
         filter: Optional[Dict[str, Any]] = None
     ) -> List[Dict[str, Any]]:
-        raise HTTPException(status_code=501, detail=f"{self.name}: search not implemented")
+        """Search for similar vectors using cosine similarity with deduplication"""
+        if not self.client:
+            await self.connect()
+
+        try:
+            # Capitalize collection name to match Weaviate class name
+            class_name = collection_name.capitalize()
+            collection = self.client.collections.get(class_name)
+
+            # Search for top candidates (3x to ensure enough unique documents)
+            response = collection.query.near_vector(
+                near_vector=query_vector,
+                limit=top_k * 3,
+                return_metadata=MetadataQuery(distance=True)
+            )
+
+            # Deduplicate by pdf_id - keep best scoring patch per document
+            seen_pdfs = {}
+            for obj in response.objects:
+                pdf_id = obj.properties.get('pdf_id')
+
+                # Convert distance to similarity score (for cosine: similarity = 1 - distance)
+                distance = obj.metadata.distance if obj.metadata.distance is not None else 1.0
+                score = 1.0 - distance
+
+                # Keep the first (highest scoring) result for each pdf_id
+                if pdf_id and pdf_id not in seen_pdfs:
+                    seen_pdfs[pdf_id] = {
+                        'pdf_id': pdf_id,
+                        'page_num': obj.properties.get('page_num'),
+                        'patch_index': obj.properties.get('patch_index'),
+                        'title': obj.properties.get('title'),
+                        'score': score
+                    }
+
+            # Convert to list and take top_k
+            results = list(seen_pdfs.values())[:top_k]
+
+            return results
+
+        except Exception as e:
+            raise HTTPException(
+                status_code=500,
+                detail=f"{self.name}: Failed to search - {str(e)}"
+            )
 
     async def delete(
         self,
