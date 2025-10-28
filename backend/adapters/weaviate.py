@@ -1,7 +1,7 @@
 from typing import List, Dict, Any, Optional
 import os
 import weaviate
-from weaviate.classes.config import Configure
+from weaviate.classes.config import Configure, Property, DataType, VectorDistances
 from fastapi import HTTPException
 from .base import VectorDatabase
 
@@ -35,7 +35,41 @@ class WeaviateAdapter(VectorDatabase):
             )
 
     async def create_collection(self, collection_name: str, dimension: int) -> None:
-        raise HTTPException(status_code=501, detail=f"{self.name}: create_collection not implemented")
+        """Create a Weaviate collection (class) for storing vectors with metadata"""
+        if not self.client:
+            await self.connect()
+
+        try:
+            # Capitalize collection name (Weaviate convention for class names)
+            class_name = collection_name.capitalize()
+
+            # Delete collection if exists (for experimentation)
+            if self.client.collections.exists(class_name):
+                self.client.collections.delete(class_name)
+                print(f"Deleted existing collection: {class_name}")
+
+            # Create collection with properties and vector configuration
+            self.client.collections.create(
+                name=class_name,
+                properties=[
+                    Property(name="pdf_id", data_type=DataType.TEXT),
+                    Property(name="page_num", data_type=DataType.INT),
+                    Property(name="patch_index", data_type=DataType.INT),
+                    Property(name="title", data_type=DataType.TEXT),
+                ],
+                vectorizer_config=Configure.Vectorizer.none(),  # We provide our own vectors
+                vector_index_config=Configure.VectorIndex.hnsw(
+                    distance_metric=VectorDistances.COSINE
+                )
+            )
+
+            print(f"Created Weaviate collection '{class_name}' with dimension {dimension}")
+
+        except Exception as e:
+            raise HTTPException(
+                status_code=500,
+                detail=f"{self.name}: Failed to create collection - {str(e)}"
+            )
 
     async def insert(
         self,
