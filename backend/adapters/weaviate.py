@@ -1,7 +1,9 @@
 from typing import List, Dict, Any, Optional
 import os
+import uuid
 import weaviate
 from weaviate.classes.config import Configure, Property, DataType, VectorDistances
+from weaviate.util import generate_uuid5
 from fastapi import HTTPException
 from .base import VectorDatabase
 
@@ -78,7 +80,62 @@ class WeaviateAdapter(VectorDatabase):
         metadata: List[Dict[str, Any]],
         ids: Optional[List[str]] = None
     ) -> None:
-        raise HTTPException(status_code=501, detail=f"{self.name}: insert not implemented")
+        """Insert vectors with metadata into the Weaviate collection"""
+        if not self.client:
+            await self.connect()
+
+        if len(vectors) != len(metadata):
+            raise HTTPException(
+                status_code=400,
+                detail="Number of vectors must match number of metadata entries"
+            )
+
+        try:
+            # Capitalize collection name to match Weaviate class name
+            class_name = collection_name.capitalize()
+            collection = self.client.collections.get(class_name)
+
+            # Prepare data objects for batch insert
+            objects = []
+            for i, (vector, meta) in enumerate(zip(vectors, metadata)):
+                # Generate deterministic UUID from metadata (for idempotent inserts)
+                pdf_id = meta.get('pdf_id', '')
+                page_num = meta.get('page_num', 0)
+                patch_index = meta.get('patch_index', i)
+
+                # Create deterministic UUID using pdf_id, page_num, and patch_index
+                unique_str = f"{pdf_id}_{page_num}_{patch_index}"
+                object_uuid = generate_uuid5(unique_str)
+
+                # Create data object with properties and vector
+                obj = {
+                    "uuid": object_uuid,
+                    "properties": {
+                        "pdf_id": str(pdf_id),
+                        "page_num": int(page_num),
+                        "patch_index": int(patch_index),
+                        "title": meta.get('title', '')
+                    },
+                    "vector": vector
+                }
+                objects.append(obj)
+
+            # Batch insert objects
+            with collection.batch.dynamic() as batch:
+                for obj in objects:
+                    batch.add_object(
+                        properties=obj["properties"],
+                        vector=obj["vector"],
+                        uuid=obj["uuid"]
+                    )
+
+            print(f"Inserted {len(objects)} vectors into '{class_name}'")
+
+        except Exception as e:
+            raise HTTPException(
+                status_code=500,
+                detail=f"{self.name}: Failed to insert vectors - {str(e)}"
+            )
 
     async def search(
         self,
