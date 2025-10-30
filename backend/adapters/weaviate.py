@@ -3,7 +3,7 @@ import os
 import uuid
 import weaviate
 from weaviate.classes.config import Configure, Property, DataType, VectorDistances
-from weaviate.classes.query import MetadataQuery
+from weaviate.classes.query import MetadataQuery, Filter
 from weaviate.util import generate_uuid5
 from fastapi import HTTPException
 from .base import VectorDatabase
@@ -196,7 +196,29 @@ class WeaviateAdapter(VectorDatabase):
         collection_name: str,
         ids: List[str]
     ) -> None:
-        raise HTTPException(status_code=501, detail=f"{self.name}: delete not implemented")
+        """Delete vectors by pdf_id (cascading delete for all pages)"""
+        if not self.client:
+            await self.connect()
+
+        try:
+            # Capitalize collection name to match Weaviate class name
+            class_name = collection_name.capitalize()
+            collection = self.client.collections.get(class_name)
+
+            # Delete all objects matching any of the pdf_ids
+            for pdf_id in ids:
+                collection.data.delete_many(
+                    where=Filter.by_property("pdf_id").equal(pdf_id)
+                )
+                print(f"Deleted objects for pdf_id: {pdf_id}")
+
+            print(f"Deleted vectors for {len(ids)} PDFs from '{class_name}'")
+
+        except Exception as e:
+            raise HTTPException(
+                status_code=500,
+                detail=f"{self.name}: Failed to delete vectors - {str(e)}"
+            )
 
     async def disconnect(self) -> None:
         """Close the connection to Weaviate"""
