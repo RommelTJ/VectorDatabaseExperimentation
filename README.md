@@ -2,7 +2,7 @@
 
 Experimenting with embeddings and vector databases
 
-Version: 0.11.0 - 25 Oct 2025
+Version: 0.12.0 - 30 Oct 2025
 
 ## Quick Start
 
@@ -547,3 +547,103 @@ du -sh ./data/embeddings
 - Fun: ⭐⭐ (2/5) - Least fun database (dependency hell, noisy logs, API quirks)
 
 **Key Insight**: Milvus is a **high-performance specialist** for bulk ingestion (32K emb/s is unmatched) but struggles with concurrency, has a steep learning curve, and rough developer experience. Use only if you need maximum write throughput and have expertise to handle its quirks. For general-purpose vector search, **Qdrant or Elasticsearch are safer choices**.
+
+### Weaviate
+
+#### Setup and Basic Operations
+
+```bash
+# Start the Weaviate service
+VECTOR_DB_TYPE=weaviate docker compose --profile weaviate up -d
+
+# Check logs
+docker compose logs weaviate
+
+# Test database connection
+curl http://localhost:8000/api/db/test-connection
+
+# Create the vector collection (class)
+curl -X POST http://localhost:8000/api/db/create-collection
+
+# Verify collection exists (via Weaviate API)
+curl http://localhost:8080/v1/schema
+
+# Or use GraphQL endpoint
+curl -X POST http://localhost:8080/v1/graphql \
+  -H "Content-Type: application/json" \
+  -d '{"query": "{ Aggregate { Patterns { meta { count } } } }"}'
+```
+
+#### Data Ingestion
+
+```bash
+# Insert a few test PDFs from cache
+curl -X POST "http://localhost:8000/api/db/test-insert?num_pdfs=2"
+
+# Check inserted data (via GraphQL)
+curl -X POST http://localhost:8080/v1/graphql \
+  -H "Content-Type: application/json" \
+  -d '{"query": "{ Aggregate { Patterns { meta { count } } } }"}'
+
+# Full ingestion of all 80 training PDFs
+docker compose exec backend python ingest_all_training.py
+
+# Verify total count (should be 423,741 embeddings)
+curl -X POST http://localhost:8080/v1/graphql \
+  -H "Content-Type: application/json" \
+  -d '{"query": "{ Aggregate { Patterns { meta { count } } } }"}'
+```
+
+#### Search Operations
+
+```bash
+# Text search
+curl -X POST http://localhost:8000/api/search/text \
+  -H "Content-Type: application/json" \
+  -d '{"query": "cable knit pattern", "limit": 5}'
+
+# Search for beginner patterns
+curl -X POST http://localhost:8000/api/search/text \
+  -H "Content-Type: application/json" \
+  -d '{"query": "beginner friendly", "limit": 5}'
+```
+
+#### Delete Operations
+
+```bash
+# Delete a specific PDF (URL-encode spaces as %20)
+curl -X DELETE "http://localhost:8000/api/db/delete-pdf/10.1.21_Knot%20Your%20Mamas%20Headband"
+
+# Verify deletion (via count)
+curl -X POST http://localhost:8080/v1/graphql \
+  -H "Content-Type: application/json" \
+  -d '{"query": "{ Aggregate { Patterns { meta { count } } } }"}'
+```
+
+#### Storage Usage
+
+```bash
+# Check Weaviate volume size
+docker compose exec weaviate du -sh /var/lib/weaviate
+
+# Compare to embeddings cache baseline
+du -sh ./data/embeddings
+```
+
+#### Performance Evaluation
+
+**Full evaluation results**: [WEAVIATE_EVALUATION.md](./WEAVIATE_EVALUATION.md)
+
+**Quick Summary**:
+- **Ingestion**: 811 embeddings/sec (SLOWEST - even slower than Postgres!)
+- **Query latency**: p50=560ms (FASTEST - 2x faster than all competitors!)
+- **Concurrency**: 100% success rate at 10 users (ONLY database with perfect reliability!)
+- **Memory**: 13.7GB peak (dominated by ColPali model)
+- **Storage**: 641MB for 423K vectors (3.1x overhead - middle of the pack)
+
+**Ratings**:
+- Practicality: ⭐⭐⭐⭐ (4/5) - Best for production read-heavy workloads
+- Learnings: ⭐⭐⭐⭐⭐ (5/5) - Trade-offs between read/write performance are real
+- Fun: ⭐⭐⭐ (3/5) - Slow ingestion frustrating, fast queries delightful
+
+**Key Insight**: Weaviate makes an **intentional trade-off** - sacrifice ingestion speed for query performance and reliability. It's the SLOWEST at writes (811 emb/s) but FASTEST at reads (560ms vs ~1200ms) with PERFECT reliability (100% success). Use when query latency and uptime matter more than ingestion throughput.
