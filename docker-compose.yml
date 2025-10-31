@@ -23,6 +23,11 @@ services:
       - MILVUS_PORT=19530
       - WEAVIATE_HOST=weaviate
       - WEAVIATE_PORT=8080
+      - MONGODB_HOST=mongodb
+      - MONGODB_PORT=27017
+      - MONGODB_USER=vectordb
+      - MONGODB_PASSWORD=vectordb123
+      - MONGODB_DB=knitting_patterns
     volumes:
       - huggingface-cache:/root/.cache/huggingface
       - ./data:/app/data  # Mount data directory (PDFs and embeddings)
@@ -155,6 +160,24 @@ services:
       timeout: 5s
       retries: 5
 
+  mongodb:
+    profiles: ["mongodb"]
+    image: mongodb/mongodb-atlas-local:latest
+    ports:
+      - "27017:27017"
+    environment:
+      - MONGODB_INITDB_ROOT_USERNAME=vectordb
+      - MONGODB_INITDB_ROOT_PASSWORD=vectordb123
+    volumes:
+      - mongodb-data:/data/db
+    networks:
+      - app-network
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
 networks:
   app-network:
     driver: bridge
@@ -167,3 +190,4 @@ volumes:
   elasticsearch-data:
   milvus-data:
   weaviate-data:
+  mongodb-data:
