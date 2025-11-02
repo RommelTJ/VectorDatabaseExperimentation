@@ -47,7 +47,48 @@ class MongoDBAdapter(VectorDatabase):
             )
 
     async def create_collection(self, collection_name: str, dimension: int) -> None:
-        raise HTTPException(status_code=501, detail=f"{self.name}: create_collection not implemented")
+        """Create a collection with vector search index"""
+        if not self.client:
+            await self.connect()
+
+        try:
+            # Drop collection if exists (for experimentation)
+            await self.db[collection_name].drop()
+
+            # Create collection explicitly (optional, but good for clarity)
+            await self.db.create_collection(collection_name)
+
+            # Create vector search index
+            # MongoDB Atlas Local uses createSearchIndexes command
+            index_definition = {
+                "name": "vector_index",
+                "type": "vectorSearch",
+                "definition": {
+                    "fields": [
+                        {
+                            "type": "vector",
+                            "path": "embedding",
+                            "numDimensions": dimension,
+                            "similarity": "cosine"
+                        }
+                    ]
+                }
+            }
+
+            # Create the search index
+            collection = self.db[collection_name]
+            await collection.create_search_index(index_definition)
+
+            # Create regular index on pdf_id for faster lookups/deletes
+            await collection.create_index("pdf_id")
+
+            print(f"Created collection '{collection_name}' with dimension {dimension} and vector search index")
+
+        except Exception as e:
+            raise HTTPException(
+                status_code=500,
+                detail=f"{self.name}: Failed to create collection - {str(e)}"
+            )
 
     async def insert(
         self,
