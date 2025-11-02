@@ -215,7 +215,23 @@ class MongoDBAdapter(VectorDatabase):
         collection_name: str,
         ids: List[str]
     ) -> None:
-        raise HTTPException(status_code=501, detail=f"{self.name}: delete not implemented")
+        """Delete vectors by pdf_id (cascading delete for all pages)"""
+        if not self.client:
+            await self.connect()
+
+        try:
+            collection = self.db[collection_name]
+
+            # Delete all documents matching the pdf_ids
+            result = await collection.delete_many({"pdf_id": {"$in": ids}})
+
+            print(f"Deleted {result.deleted_count} vectors for {len(ids)} PDFs from '{collection_name}'")
+
+        except Exception as e:
+            raise HTTPException(
+                status_code=500,
+                detail=f"{self.name}: Failed to delete vectors - {str(e)}"
+            )
 
     async def disconnect(self) -> None:
         """Close the MongoDB connection"""
