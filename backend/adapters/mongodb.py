@@ -58,26 +58,32 @@ class MongoDBAdapter(VectorDatabase):
             # Create collection explicitly (optional, but good for clarity)
             await self.db.create_collection(collection_name)
 
-            # Create vector search index
+            # Create vector search index using MongoDB command
             # MongoDB Atlas Local uses createSearchIndexes command
-            index_definition = {
-                "name": "vector_index",
-                "type": "vectorSearch",
-                "definition": {
-                    "fields": [
-                        {
-                            "type": "vector",
-                            "path": "embedding",
-                            "numDimensions": dimension,
-                            "similarity": "cosine"
+            collection = self.db[collection_name]
+
+            create_index_command = {
+                "createSearchIndexes": collection_name,
+                "indexes": [
+                    {
+                        "name": "vector_index",
+                        "type": "vectorSearch",
+                        "definition": {
+                            "fields": [
+                                {
+                                    "type": "vector",
+                                    "path": "embedding",
+                                    "numDimensions": dimension,
+                                    "similarity": "cosine"
+                                }
+                            ]
                         }
-                    ]
-                }
+                    }
+                ]
             }
 
-            # Create the search index
-            collection = self.db[collection_name]
-            await collection.create_search_index(index_definition)
+            result = await self.db.command(create_index_command)
+            print(f"Vector search index creation result: {result}")
 
             # Create regular index on pdf_id for faster lookups/deletes
             await collection.create_index("pdf_id")
