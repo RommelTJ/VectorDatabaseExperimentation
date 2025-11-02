@@ -141,7 +141,74 @@ class MongoDBAdapter(VectorDatabase):
         top_k: int = 10,
         filter: Optional[Dict[str, Any]] = None
     ) -> List[Dict[str, Any]]:
-        raise HTTPException(status_code=501, detail=f"{self.name}: search not implemented")
+        """Search for similar vectors using MongoDB vector search"""
+        if not self.client:
+            await self.connect()
+
+        try:
+            collection = self.db[collection_name]
+
+            # MongoDB vector search aggregation pipeline
+            # Fetch 3x results to ensure enough unique documents after deduplication
+            pipeline = [
+                {
+                    "$vectorSearch": {
+                        "index": "vector_index",
+                        "path": "embedding",
+                        "queryVector": query_vector,
+                        "numCandidates": top_k * 10,  # Number of candidates to consider
+                        "limit": top_k * 3  # Fetch 3x results for deduplication
+                    }
+                },
+                {
+                    "$addFields": {
+                        "score": {"$meta": "vectorSearchScore"}
+                    }
+                },
+                # Deduplicate by pdf_id, keeping the best scoring patch per document
+                {
+                    "$sort": {"score": -1}
+                },
+                {
+                    "$group": {
+                        "_id": "$pdf_id",
+                        "pdf_id": {"$first": "$pdf_id"},
+                        "page_num": {"$first": "$page_num"},
+                        "patch_index": {"$first": "$patch_index"},
+                        "title": {"$first": "$title"},
+                        "score": {"$first": "$score"}
+                    }
+                },
+                {
+                    "$sort": {"score": -1}
+                },
+                {
+                    "$limit": top_k
+                },
+                # Project to remove the _id field used for grouping
+                {
+                    "$project": {
+                        "_id": 0,
+                        "pdf_id": 1,
+                        "page_num": 1,
+                        "patch_index": 1,
+                        "title": 1,
+                        "score": 1
+                    }
+                }
+            ]
+
+            # Execute aggregation pipeline
+            cursor = collection.aggregate(pipeline)
+            results = await cursor.to_list(length=top_k)
+
+            return results
+
+        except Exception as e:
+            raise HTTPException(
+                status_code=500,
+                detail=f"{self.name}: Failed to search - {str(e)}"
+            )
 
     async def delete(
         self,
