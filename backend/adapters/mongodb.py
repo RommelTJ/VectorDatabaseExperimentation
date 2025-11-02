@@ -97,7 +97,42 @@ class MongoDBAdapter(VectorDatabase):
         metadata: List[Dict[str, Any]],
         ids: Optional[List[str]] = None
     ) -> None:
-        raise HTTPException(status_code=501, detail=f"{self.name}: insert not implemented")
+        """Insert vectors with metadata into the collection"""
+        if not self.client:
+            await self.connect()
+
+        if len(vectors) != len(metadata):
+            raise HTTPException(
+                status_code=400,
+                detail="Number of vectors must match number of metadata entries"
+            )
+
+        try:
+            collection = self.db[collection_name]
+
+            # Prepare documents for batch insert
+            documents = []
+            for i, (vector, meta) in enumerate(zip(vectors, metadata)):
+                doc = {
+                    "pdf_id": meta.get('pdf_id', ''),
+                    "page_num": meta.get('page_num', 0),
+                    "patch_index": meta.get('patch_index', i),
+                    "embedding": vector,  # MongoDB stores arrays natively
+                    "title": meta.get('title', None)
+                }
+                documents.append(doc)
+
+            # Batch insert with ordered=False for better performance
+            # This allows MongoDB to continue inserting even if some documents fail
+            if documents:
+                result = await collection.insert_many(documents, ordered=False)
+                print(f"Inserted {len(result.inserted_ids)} vectors into '{collection_name}'")
+
+        except Exception as e:
+            raise HTTPException(
+                status_code=500,
+                detail=f"{self.name}: Failed to insert - {str(e)}"
+            )
 
     async def search(
         self,
