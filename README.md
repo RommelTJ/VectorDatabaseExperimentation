@@ -647,3 +647,92 @@ du -sh ./data/embeddings
 - Fun: ⭐⭐⭐ (3/5) - Slow ingestion frustrating, fast queries delightful
 
 **Key Insight**: Weaviate makes an **intentional trade-off** - sacrifice ingestion speed for query performance and reliability. It's the SLOWEST at writes (811 emb/s) but FASTEST at reads (560ms vs ~1200ms) with PERFECT reliability (100% success). Use when query latency and uptime matter more than ingestion throughput.
+
+### MongoDB
+
+#### Setup and Basic Operations
+
+```bash
+# Start the MongoDB service
+VECTOR_DB_TYPE=mongodb docker compose --profile mongodb up -d
+
+# Check logs
+docker compose logs mongodb
+
+# Test database connection
+curl http://localhost:8000/api/db/test-connection
+
+# Create the vector collection
+curl -X POST http://localhost:8000/api/db/create-collection
+```
+
+#### Data Ingestion
+
+```bash
+# Insert a few test PDFs from cache
+curl -X POST "http://localhost:8000/api/db/test-insert?num_pdfs=2"
+
+# Full ingestion of all 80 training PDFs
+docker compose exec backend python ingest_all_training.py
+
+# IMPORTANT: Create vector search index AFTER data ingestion
+docker compose exec mongodb mongosh -u vectordb -p vectordb123 --authenticationDatabase admin knitting_patterns --eval 'db.runCommand({createSearchIndexes: "patterns", indexes: [{name: "vector_index", type: "vectorSearch", definition: {fields: [{type: "vector", path: "embedding", numDimensions: 128, similarity: "cosine"}]}}]})'
+
+# Wait for index to build (check status until READY)
+docker compose exec mongodb mongosh -u vectordb -p vectordb123 --authenticationDatabase admin knitting_patterns --eval 'db.patterns.aggregate([{$listSearchIndexes: {}}]).toArray()'
+
+# Verify total count (should be 423,741 embeddings)
+docker compose exec mongodb mongosh -u vectordb -p vectordb123 --authenticationDatabase admin knitting_patterns --eval "db.patterns.countDocuments()"
+```
+
+#### Search Operations
+
+```bash
+# Text search
+curl -X POST http://localhost:8000/api/search/text \
+  -H "Content-Type: application/json" \
+  -d '{"query": "cable knit pattern", "limit": 5}'
+
+# Search for cardigan patterns
+curl -X POST http://localhost:8000/api/search/text \
+  -H "Content-Type: application/json" \
+  -d '{"query": "cardigan", "limit": 5}'
+```
+
+#### Delete Operations
+
+```bash
+# Delete a specific PDF (URL-encode spaces as %20)
+curl -X DELETE "http://localhost:8000/api/db/delete-pdf/10.1.21_Knot%20Your%20Mamas%20Headband"
+
+# Verify deletion (via count)
+docker compose exec mongodb mongosh -u vectordb -p vectordb123 --authenticationDatabase admin knitting_patterns --eval "db.patterns.countDocuments()"
+```
+
+#### Storage Usage
+
+```bash
+# Check MongoDB volume size
+docker compose exec mongodb du -sh /data/db
+
+# Compare to embeddings cache baseline
+du -sh ./data/embeddings
+```
+
+#### Performance Evaluation
+
+**Full evaluation results**: [MONGODB_EVALUATION.md](./MONGODB_EVALUATION.md)
+
+**Quick Summary**:
+- **Ingestion**: 38,596 embeddings/sec (FASTEST - 1.19x faster than Milvus!)
+- **Query latency**: p50=761ms (competitive single-user performance)
+- **Concurrency**: ⚠️ 100% success rate BUT 19,572ms p50 at 10 users (6.5x degradation!)
+- **Memory**: 14.2GB peak (dominated by ColPali model)
+- **Storage**: 2.5GB for 423K vectors (12.1x overhead - WORST efficiency)
+
+**Ratings**:
+- Practicality: ⭐⭐ (2/5) - Only for write-heavy, zero-concurrency use cases
+- Learnings: ⭐⭐⭐⭐⭐ (5/5) - Write speed ≠ production readiness
+- Fun: ⭐⭐ (2/5) - Impressive ingestion, disappointing concurrency
+
+**Key Insight**: MongoDB is a **write specialist that fails at concurrent reads**. The 38.6K emb/s ingestion is unmatched, but catastrophic latency degradation under load (6.5x slower at 10 users) and massive storage overhead (12.1x) make it unsuitable for production vector search. **Use only as a tactical write buffer** - bulk insert at incredible speed, then sync to a proper vector database (Qdrant/Weaviate) for querying. The quirk that vector search indexes must be created AFTER data insertion adds deployment complexity.
