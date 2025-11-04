@@ -2,7 +2,23 @@
 
 Experimenting with embeddings and vector databases
 
-Version: 0.13.0 - 02 Nov 2025
+Version: 1.0.0 - 03 Nov 2025
+
+## TLDR: Which Vector Database to Use?
+
+After testing all 7 databases with 423,741 embeddings, here's my ranking:
+
+1. **Qdrant** - Best all-around (speed + efficiency + DX)
+2. **Weaviate** - Best for production read-heavy workloads (100% reliability, 2x faster queries)
+3. **Postgres + pgvector** - Most practical for existing Postgres users (one database for everything!)
+4. **Elasticsearch** - Best for hybrid search (vectors + full-text + aggregations)
+5. **Milvus** - Feature-rich for experts (GPU, disk indices, but 90% success rate)
+6. **Redis** - Caching layer only (55% success rate standalone)
+7. **MongoDB** - Write buffer only (6.5x latency degradation under load)
+
+**For most people**: Start with **Qdrant** (if vector-first) or **Postgres** (if already using Postgres). Both are excellent.
+
+**Full analysis**: See [OVERALL_FINDINGS.md](./OVERALL_FINDINGS.md) for detailed comparisons, benchmarks, and recommendations.
 
 ## Quick Start
 
