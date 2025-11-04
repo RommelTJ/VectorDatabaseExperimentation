@@ -2,7 +2,7 @@
 
 Experimenting with embeddings and vector databases
 
-Version: 0.13.0 - 02 Nov 2025
+Version: 1.0.0 - 03 Nov 2025
 
 ## TLDR: Which Vector Database to Use?
 
